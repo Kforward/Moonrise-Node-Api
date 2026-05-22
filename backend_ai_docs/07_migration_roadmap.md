@@ -1,0 +1,65 @@
+# 07 后端改造路线与启动优先级
+
+## 1. 目标
+
+把当前仓库从“教学型 Koa 示例工程”改造成“面向前端小程序/前端应用的正式后端服务”，服务范围以小程序的数据同步、备份恢复、隐私保护和账户体系为核心。
+
+## 2. 先保留什么
+
+- 保留 `backend_ai_docs/` 作为唯一的后端设计依据。
+- 保留当前项目中可复用的 HTTP 壳子能力，例如基础路由、中间件、错误处理思想。
+- 保留未来可能会用到的目录占位和扩展点，不要为了清理而删除尚有价值的功能入口。
+- 保留上传目录结构占位，但实际上传文件不进入仓库。
+
+## 3. 先替换什么
+
+- 将当前 Koa 教程式账号体系，替换为微信小程序登录、设备会话和 token 体系。
+- 将 MySQL + Sequelize 的示例数据层，替换为 PostgreSQL 设计与新的后端 schema。
+- 将 `goods`、`socket` 等与目标业务无关的示例模块，替换为 `auth`、`users`、`cycle`、`backup`、`privacy`、`sync`、`audit`。
+- 将当前散落在 controller / middleware 里的演示逻辑，迁移为文档要求的 `common / infrastructure / modules` 分层结构。
+
+## 4. 先删除什么
+
+- 删除或重写与目标后端无关的示例接口、示例模型和示例数据库配置。
+- 删除硬编码数据库账号、密码和本地测试常量。
+- 删除不再使用的上传样例文件和演示数据文件。
+
+## 5. 改造顺序
+
+### 5.1 第一阶段
+
+1. 重整项目目录结构，建立后端正式骨架。
+2. 切换数据库与配置方式，去除硬编码。
+3. 搭建统一响应、统一错误、请求 ID 和日志规范。
+4. 落地 `auth`、`users`、`cycle settings`、`period records` 的基础接口。
+
+### 5.2 第二阶段
+
+1. 落地 `sync_change_logs`、幂等写入和增量同步。
+2. 落地 `backup_snapshots` 及恢复审计。
+3. 落地 `privacy_configs`、`encrypted_vault_items` 和密钥版本记录。
+
+### 5.3 第三阶段
+
+1. 补齐 `audit_logs`、限流、权限和恢复流程。
+2. 补齐测试覆盖，优先补冲突校验、幂等、备份和安全相关测试。
+3. 再考虑可选能力，如更新日志、提醒队列、实时通知等。
+
+## 6. 文档启动顺序
+
+每次 Codex 进入该仓库时，优先按以下顺序阅读：
+
+1. `README.md`
+2. `backend_ai_docs/README.md`
+3. `backend_ai_docs/07_migration_roadmap.md`
+4. `backend_ai_docs/00_backend_prd.md`
+5. `backend_ai_docs/01_architecture.md`
+6. `backend_ai_docs/04_database_design.md`
+7. `backend_ai_docs/06_ai_dev_rules.md`
+
+## 7. 当前最高优先级
+
+- 先把仓库从教程工程改成正式后端工程。
+- 先搭核心业务骨架，再补业务细节。
+- 先保留将来会用到的扩展点，后删除无用的 demo 代码。
+- 任何新增代码都要遵守中文注释与 JSDoc 规则。

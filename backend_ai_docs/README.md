@@ -12,7 +12,8 @@
 5. `04_database_design.md`：数据库表设计、字段说明、索引与约束。
 6. `05_security_design.md`：数据安全、加密、认证、审计和恢复策略。
 7. `06_ai_dev_rules.md`：迁移到后端项目后给 AI 使用的开发规则。
-8. `database/001_initial_schema.sql`：PostgreSQL 建表草案。
+8. `07_migration_roadmap.md`：当前仓库改造成正式后端项目的保留、替换、删除和优先级路线。
+9. `database/001_initial_schema.sql`：PostgreSQL 建表草案。
 
 ## 当前设计基准
 
@@ -24,4 +25,8 @@
 
 ## 迁移方式
 
-将整个 `backend_ai_docs/` 复制到后端仓库根目录。后端 Codex 或其他 AI 进入后端项目时，应优先阅读本文件，再阅读 `00_backend_prd.md` 和 `06_ai_dev_rules.md`。
+将整个 `backend_ai_docs/` 复制到后端仓库根目录。后端 Codex 或其他 AI 进入后端项目时，应优先阅读本文件，再阅读 `07_migration_roadmap.md`、`00_backend_prd.md` 和 `06_ai_dev_rules.md`。
+
+## Codex 启动优先级
+
+每次 Codex 进入当前仓库时，先阅读 `07_migration_roadmap.md` 判断当前改造阶段和优先事项，再根据具体任务补读产品、架构、数据库、安全和开发规则文档。

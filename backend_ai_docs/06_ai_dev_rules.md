@@ -3,7 +3,8 @@
 ## 1. 默认原则
 
 - 默认使用中文沟通。
-- 先读本目录 README，再读 `00_backend_prd.md`、`04_database_design.md` 和本文件。
+- 先读本目录 README，再读 `07_migration_roadmap.md`、`00_backend_prd.md`、`04_database_design.md` 和本文件。
+- 每次启动 Codex 时，先根据 `07_migration_roadmap.md` 判断当前任务属于骨架改造、业务模块落地、数据同步、安全隐私还是测试补齐。
 - 不把小程序页面状态直接当后端表结构。
 - 不把敏感数据当普通业务字段处理。
 - 不在业务表中保存明文主密钥、微信 session key 或 refresh token 明文。
