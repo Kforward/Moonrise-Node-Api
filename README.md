@@ -1410,7 +1410,7 @@ GET http://localhost:8000/api/v1/health
 
 ## 数据库迁移
 
-当前默认使用 `DATABASE_DRIVER=memory`，便于前端本地联调不依赖 PostgreSQL。PostgreSQL/Drizzle 基础设施、schema 和初始迁移已接入，`auth / users` 已具备内存/PostgreSQL 双仓储实现，认证审计日志和用户资料同步日志可在 PostgreSQL 模式写入对应数据表。后续会逐步把 `cycle / sync` 仓储从内存适配器切到持久化适配器。
+当前默认使用 `DATABASE_DRIVER=memory`，便于前端本地联调不依赖 PostgreSQL。PostgreSQL/Drizzle 基础设施、schema 和初始迁移已接入，`auth / users / cycle` 已具备内存/PostgreSQL 双仓储实现，认证审计日志、用户资料同步日志和周期同步日志可在 PostgreSQL 模式写入对应数据表。后续会逐步把 `sync` 剩余仓储能力从内存适配器切到持久化适配器。
 
 ```bash
 npm run db:generate
@@ -1447,5 +1447,4 @@ DATABASE_URL=postgresql://moonrise:moonrise_password@localhost:5432/moonrise
 ## 迁移方式
 
 将整个 `backend_ai_docs/` 复制到后端仓库根目录。后端 Codex 或其他 AI 进入后端项目时，应优先阅读本文件，再阅读 `backend_ai_docs/07_migration_roadmap.md`、`backend_ai_docs/00_backend_prd.md` 和 `backend_ai_docs/06_ai_dev_rules.md`。
-
 

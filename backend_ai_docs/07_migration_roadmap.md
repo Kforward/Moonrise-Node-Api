@@ -36,7 +36,8 @@
 6. 已完成：引入 PostgreSQL/Drizzle 基础设施、完整 schema 和初始迁移文件，默认仍保留内存仓储便于本地联调。
 7. 已完成：为 `auth` 接入 repository 抽象、内存实现和 PostgreSQL 实现；认证审计日志可在 PostgreSQL 模式写入 `audit_logs`。
 8. 已完成：为 `users` 接入 repository 抽象、内存实现和 PostgreSQL 实现；用户资料同步日志可在 PostgreSQL 模式写入 `sync_change_logs`。
-9. 下一步：把 `cycle / sync` 的内存读写逐步替换为 PostgreSQL repository，并补齐生产级微信登录与测试覆盖。
+9. 已完成：为 `cycle` 接入 repository 抽象、内存实现和 PostgreSQL 实现；周期设置与经期记录同步日志可在 PostgreSQL 模式写入 `sync_change_logs`。
+10. 下一步：把 `sync` 剩余内存读写替换为 PostgreSQL repository，并补齐生产级微信登录与测试覆盖。
 
 ### 5.2 第二阶段
 
@@ -64,7 +65,7 @@
 
 ## 7. 当前最高优先级
 
-- 将开发期内存仓储逐模块替换为 PostgreSQL/Drizzle repository，当前优先顺序为 `cycle`、`sync`。
+- 将开发期内存仓储逐模块替换为 PostgreSQL/Drizzle repository，当前优先顺序为 `sync`。
 - 接入真实微信登录，替换开发期 code mock providerSubject。
 - 为周期记录重叠校验、幂等写入、token 刷新、同步日志补测试。
 - 继续落地 `sync/push`、`backup`、`privacy` 的真实业务实现。
