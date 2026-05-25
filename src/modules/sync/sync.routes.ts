@@ -21,7 +21,7 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     const currentSession = requireCurrentSession(request);
     const query = validateWithZod(listSyncChangesQuerySchema, request.query);
 
-    return buildSuccessResponse(request.id, listSyncChanges(currentSession, query));
+    return buildSuccessResponse(request.id, await listSyncChanges(currentSession, query));
   });
 
   app.post(`${basePath}/push`, createNotImplementedHandler(
@@ -32,6 +32,6 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
   app.get(`${basePath}/state`, async request => {
     const currentSession = requireCurrentSession(request);
 
-    return buildSuccessResponse(request.id, getSyncState(currentSession));
+    return buildSuccessResponse(request.id, await getSyncState(currentSession));
   });
 }

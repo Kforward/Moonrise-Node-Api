@@ -33,6 +33,42 @@ export function replayOrRunMutation<TResponse>(userId: string, clientMutationId:
 }
 
 /**
+ * 处理客户端异步幂等写入。
+ *
+ * 该函数用于包含数据库写入、审计日志或外部适配器调用的写流程，保证首次响应快照
+ * 会在异步副作用完成后再写入幂等缓存。
+ *
+ * @param userId 用户 ID。
+ * @param clientMutationId 客户端幂等键。
+ * @param run 首次提交时执行的异步写入逻辑。
+ * @returns 首次写入响应快照，或重复提交时的历史响应快照。
+ */
+export async function replayOrRunMutationAsync<TResponse>(
+  userId: string,
+  clientMutationId: string,
+  run: () => Promise<TResponse>,
+): Promise<TResponse> {
+  const mutationKey = `${userId}:${clientMutationId}`;
+  const existingMutation = memoryStore.mutations.get(mutationKey);
+
+  if (existingMutation) {
+    return cloneMutationResponse(existingMutation.response as TResponse);
+  }
+
+  const response = await run();
+  const responseSnapshot = cloneMutationResponse(response);
+
+  memoryStore.mutations.set(mutationKey, {
+    clientMutationId,
+    createdAt: nowIso(),
+    response: responseSnapshot,
+    userId,
+  });
+
+  return cloneMutationResponse(responseSnapshot);
+}
+
+/**
  * 复制幂等响应快照。
  *
  * 内存仓储中的业务记录会被后续写操作继续修改，因此幂等缓存必须保存独立快照，

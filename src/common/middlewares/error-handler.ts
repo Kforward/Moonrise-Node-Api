@@ -23,6 +23,17 @@ export function registerErrorHandler(app: FastifyInstance): void {
       return;
     }
 
+    // Fastify 自身产生的 4xx 协议错误应保留原始状态码，避免前端误判为服务端崩溃。
+    if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+      void reply.status(error.statusCode).send(buildErrorResponse(
+        request.id,
+        ERROR_CODES.VALIDATION_FAILED,
+        error.message,
+        null,
+      ));
+      return;
+    }
+
     request.log.error({ err: error }, "未处理的服务端异常");
     void reply.status(500).send(buildErrorResponse(
       request.id,

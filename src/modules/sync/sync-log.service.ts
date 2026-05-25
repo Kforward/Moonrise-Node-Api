@@ -57,8 +57,8 @@ export function appendSyncChange(input: AppendSyncChangeInput): SyncChangeLogRec
  * @param currentSession 当前用户与设备会话。
  * @param query 增量查询参数。
  */
-export function listSyncChanges(currentSession: CurrentSession, query: ListSyncChangesQuery) {
-  const session = requireActiveSession(currentSession);
+export async function listSyncChanges(currentSession: CurrentSession, query: ListSyncChangesQuery) {
+  const session = await requireActiveSession(currentSession);
   const items = memoryStore.syncChangeLogs
     .filter(change => change.userId === session.user.id && change.id > query.afterVersion)
     .sort((left, right) => left.id - right.id)
@@ -75,8 +75,8 @@ export function listSyncChanges(currentSession: CurrentSession, query: ListSyncC
  *
  * @param currentSession 当前用户与设备会话。
  */
-export function getSyncState(currentSession: CurrentSession) {
-  const session = requireActiveSession(currentSession);
+export async function getSyncState(currentSession: CurrentSession) {
+  const session = await requireActiveSession(currentSession);
   const latestChange = [...memoryStore.syncChangeLogs]
     .filter(change => change.userId === session.user.id)
     .sort((left, right) => right.id - left.id)[0];

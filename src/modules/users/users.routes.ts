@@ -19,26 +19,26 @@ export async function registerUsersRoutes(app: FastifyInstance): Promise<void> {
   app.get(`${basePath}/me`, async request => {
     const currentSession = requireCurrentSession(request);
 
-    return buildSuccessResponse(request.id, getCurrentUserProfile(currentSession));
+    return buildSuccessResponse(request.id, await getCurrentUserProfile(currentSession));
   });
 
   app.post(`${basePath}/me/update`, async request => {
     const currentSession = requireCurrentSession(request);
     const input = validateWithZod(updateUserProfileSchema, request.body);
 
-    return buildSuccessResponse(request.id, updateCurrentUserProfile(currentSession, input));
+    return buildSuccessResponse(request.id, await updateCurrentUserProfile(currentSession, input));
   });
 
   app.get(`${basePath}/me/devices`, async request => {
     const currentSession = requireCurrentSession(request);
 
-    return buildSuccessResponse(request.id, listCurrentUserDevices(currentSession));
+    return buildSuccessResponse(request.id, await listCurrentUserDevices(currentSession));
   });
 
   app.post(`${basePath}/me/devices/revoke`, async request => {
     const currentSession = requireCurrentSession(request);
     const input = validateWithZod(revokeDeviceSchema, request.body);
 
-    return buildSuccessResponse(request.id, revokeUserDevice(currentSession, input));
+    return buildSuccessResponse(request.id, await revokeUserDevice(currentSession, input));
   });
 }

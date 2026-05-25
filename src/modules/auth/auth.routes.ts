@@ -19,24 +19,24 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   app.post(`${basePath}/wechat/login`, async request => {
     const input = validateWithZod(wechatLoginSchema, request.body);
 
-    return buildSuccessResponse(request.id, loginWithWechat(input));
+    return buildSuccessResponse(request.id, await loginWithWechat(input));
   });
 
   app.post(`${basePath}/refresh`, async request => {
     const input = validateWithZod(refreshTokenSchema, request.body);
 
-    return buildSuccessResponse(request.id, refreshSession(input));
+    return buildSuccessResponse(request.id, await refreshSession(input));
   });
 
   app.post(`${basePath}/logout`, async request => {
     const currentSession = requireCurrentSession(request);
 
-    return buildSuccessResponse(request.id, logoutSession(currentSession));
+    return buildSuccessResponse(request.id, await logoutSession(currentSession));
   });
 
   app.get(`${basePath}/session`, async request => {
     const currentSession = requireCurrentSession(request);
 
-    return buildSuccessResponse(request.id, getCurrentSession(currentSession));
+    return buildSuccessResponse(request.id, await getCurrentSession(currentSession));
   });
 }

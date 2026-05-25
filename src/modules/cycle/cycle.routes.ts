@@ -34,48 +34,48 @@ export async function registerCycleRoutes(app: FastifyInstance): Promise<void> {
   app.get(`${basePath}/settings`, async request => {
     const currentSession = requireCurrentSession(request);
 
-    return buildSuccessResponse(request.id, getCycleSettings(currentSession));
+    return buildSuccessResponse(request.id, await getCycleSettings(currentSession));
   });
 
   app.post(`${basePath}/settings/update`, async request => {
     const currentSession = requireCurrentSession(request);
     const input = validateWithZod(updateCycleSettingsSchema, request.body);
 
-    return buildSuccessResponse(request.id, updateCycleSettings(currentSession, input));
+    return buildSuccessResponse(request.id, await updateCycleSettings(currentSession, input));
   });
 
   app.get(`${basePath}/records`, async request => {
     const currentSession = requireCurrentSession(request);
     const query = validateWithZod(listPeriodRecordsQuerySchema, request.query);
 
-    return buildSuccessResponse(request.id, listPeriodRecords(currentSession, query));
+    return buildSuccessResponse(request.id, await listPeriodRecords(currentSession, query));
   });
 
   app.post(`${basePath}/records/create`, async request => {
     const currentSession = requireCurrentSession(request);
     const input = validateWithZod(createPeriodRecordSchema, request.body);
 
-    return buildSuccessResponse(request.id, createPeriodRecord(currentSession, input));
+    return buildSuccessResponse(request.id, await createPeriodRecord(currentSession, input));
   });
 
   app.post(`${basePath}/records/update`, async request => {
     const currentSession = requireCurrentSession(request);
     const input = validateWithZod(updatePeriodRecordSchema, request.body);
 
-    return buildSuccessResponse(request.id, updatePeriodRecord(currentSession, input));
+    return buildSuccessResponse(request.id, await updatePeriodRecord(currentSession, input));
   });
 
   app.post(`${basePath}/records/delete`, async request => {
     const currentSession = requireCurrentSession(request);
     const input = validateWithZod(deletePeriodRecordSchema, request.body);
 
-    return buildSuccessResponse(request.id, deletePeriodRecord(currentSession, input));
+    return buildSuccessResponse(request.id, await deletePeriodRecord(currentSession, input));
   });
 
   app.post(`${basePath}/records/finish`, async request => {
     const currentSession = requireCurrentSession(request);
     const input = validateWithZod(finishPeriodRecordSchema, request.body);
 
-    return buildSuccessResponse(request.id, finishPeriodRecord(currentSession, input));
+    return buildSuccessResponse(request.id, await finishPeriodRecord(currentSession, input));
   });
 }

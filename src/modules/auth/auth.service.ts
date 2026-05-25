@@ -1,14 +1,10 @@
-import { randomUUID } from "node:crypto";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODES } from "../../common/errors/error-codes";
 import type { CurrentSession } from "../../common/types/current-session";
 import { nowIso } from "../../common/utils/date-time";
 import { sha256 } from "../../common/utils/hash";
 import {
-  createDefaultUserBundle,
-  memoryStore,
   type AppUserRecord,
-  type AuthIdentityRecord,
   type UserDeviceRecord,
   type UserProfileRecord,
 } from "../../infrastructure/database/memory-store";
@@ -16,6 +12,7 @@ import { appEnv } from "../../infrastructure/config/env";
 import { issueTokenPair, verifyRefreshToken } from "../../infrastructure/tokens/token.service";
 import { appendAuditLog } from "../audit/audit.service";
 import type { RefreshTokenInput, WechatLoginInput } from "./auth.dto";
+import { getAuthRepository, type AuthSessionBundle } from "./auth.repository";
 
 export interface PublicDevice {
   id: string;
@@ -39,12 +36,6 @@ export interface PublicUserProfile {
   updatedAt: string;
 }
 
-export interface AuthSessionBundle {
-  user: AppUserRecord;
-  profile: UserProfileRecord;
-  device: UserDeviceRecord;
-}
-
 /**
  * 开发期微信登录。
  *
@@ -52,8 +43,10 @@ export interface AuthSessionBundle {
  * 前端可以先对接登录、设备会话和 token 刷新流程。
  *
  * @param input 微信登录请求 DTO。
+ * @returns token、用户资料和设备信息。
+ * @throws 生产环境尚未接入真实微信登录时抛出未实现错误。
  */
-export function loginWithWechat(input: WechatLoginInput) {
+export async function loginWithWechat(input: WechatLoginInput) {
   if (appEnv.nodeEnv === "production") {
     throw new AppError({
       code: ERROR_CODES.NOT_IMPLEMENTED,
@@ -62,21 +55,24 @@ export function loginWithWechat(input: WechatLoginInput) {
     });
   }
 
-  const identity = findOrCreateWechatIdentity(input.code);
-  const device = upsertDevice(identity.userId, input);
+  const authRepository = getAuthRepository();
+  const identity = await authRepository.findOrCreateWechatIdentity(input.code);
+  const device = await authRepository.upsertDevice(identity.userId, input);
   const tokenPair = issueTokenPair({
     deviceId: device.id,
     userId: identity.userId,
   });
 
-  device.refreshTokenHash = sha256(tokenPair.refreshToken);
-  device.lastSeenAt = nowIso();
+  await authRepository.updateDeviceSession(device.id, {
+    lastSeenAt: nowIso(),
+    refreshTokenHash: sha256(tokenPair.refreshToken),
+  });
 
-  const session = requireActiveSession({
+  const session = await requireActiveSession({
     deviceId: device.id,
     userId: identity.userId,
   });
-  appendAuditLog({
+  await appendAuditLog({
     action: "auth.login",
     deviceId: device.id,
     metadata: {
@@ -102,10 +98,12 @@ export function loginWithWechat(input: WechatLoginInput) {
  * 刷新当前设备的 token。
  *
  * @param input refresh token 请求 DTO。
+ * @returns 新签发的 access token 与 refresh token。
+ * @throws refresh token 无效或设备会话失效时抛出业务错误。
  */
-export function refreshSession(input: RefreshTokenInput) {
+export async function refreshSession(input: RefreshTokenInput) {
   const refreshSessionPayload = verifyRefreshToken(input.refreshToken);
-  const session = requireActiveSession(refreshSessionPayload);
+  const session = await requireActiveSession(refreshSessionPayload);
   const expectedHash = sha256(input.refreshToken);
 
   if (session.device.refreshTokenHash !== expectedHash) {
@@ -116,14 +114,17 @@ export function refreshSession(input: RefreshTokenInput) {
     });
   }
 
+  const authRepository = getAuthRepository();
   const tokenPair = issueTokenPair({
     deviceId: session.device.id,
     userId: session.user.id,
   });
 
-  session.device.refreshTokenHash = sha256(tokenPair.refreshToken);
-  session.device.lastSeenAt = nowIso();
-  appendAuditLog({
+  await authRepository.updateDeviceSession(session.device.id, {
+    lastSeenAt: nowIso(),
+    refreshTokenHash: sha256(tokenPair.refreshToken),
+  });
+  await appendAuditLog({
     action: "auth.refresh",
     deviceId: session.device.id,
     resourceId: session.device.id,
@@ -143,13 +144,15 @@ export function refreshSession(input: RefreshTokenInput) {
  * 注销当前设备会话。
  *
  * @param currentSession 当前 access token 解析出的用户与设备。
+ * @returns 已注销的设备 ID 和注销时间。
+ * @throws 当前会话无效或设备已注销时抛出业务错误。
  */
-export function logoutSession(currentSession: CurrentSession) {
-  const session = requireActiveSession(currentSession);
+export async function logoutSession(currentSession: CurrentSession) {
+  const session = await requireActiveSession(currentSession);
+  const revokedAt = nowIso();
 
-  session.device.revokedAt = nowIso();
-  session.device.refreshTokenHash = null;
-  appendAuditLog({
+  await getAuthRepository().revokeDevice(session.device.id, revokedAt);
+  await appendAuditLog({
     action: "auth.logout",
     deviceId: session.device.id,
     resourceId: session.device.id,
@@ -159,7 +162,7 @@ export function logoutSession(currentSession: CurrentSession) {
 
   return {
     deviceId: session.device.id,
-    revokedAt: session.device.revokedAt,
+    revokedAt,
   };
 }
 
@@ -167,9 +170,11 @@ export function logoutSession(currentSession: CurrentSession) {
  * 获取当前会话详情。
  *
  * @param currentSession 当前 access token 解析出的用户与设备。
+ * @returns 当前用户资料和设备信息。
+ * @throws 当前会话无效或设备已注销时抛出业务错误。
  */
-export function getCurrentSession(currentSession: CurrentSession) {
-  const session = requireActiveSession(currentSession);
+export async function getCurrentSession(currentSession: CurrentSession) {
+  const session = await requireActiveSession(currentSession);
 
   return {
     device: toPublicDevice(session.device),
@@ -181,11 +186,12 @@ export function getCurrentSession(currentSession: CurrentSession) {
  * 校验当前用户和设备仍处于可用状态。
  *
  * @param currentSession 当前 access token 解析出的用户与设备。
+ * @returns 已校验的用户、资料和设备聚合。
+ * @throws 用户不存在、设备不存在或设备已注销时抛出业务错误。
  */
-export function requireActiveSession(currentSession: CurrentSession): AuthSessionBundle {
-  const user = memoryStore.users.get(currentSession.userId);
-  const profile = memoryStore.profiles.get(currentSession.userId);
-  const device = memoryStore.devices.get(currentSession.deviceId);
+export async function requireActiveSession(currentSession: CurrentSession): Promise<AuthSessionBundle> {
+  const authRepository = getAuthRepository();
+  const { device, profile, user } = await authRepository.findSession(currentSession);
 
   if (!user || !profile || user.status !== "active") {
     throw new AppError({
@@ -211,10 +217,10 @@ export function requireActiveSession(currentSession: CurrentSession): AuthSessio
     });
   }
 
-  device.lastSeenAt = nowIso();
+  const touchedDevice = await authRepository.touchDeviceLastSeen(device.id, nowIso());
 
   return {
-    device,
+    device: touchedDevice ?? device,
     profile,
     user,
   };
@@ -255,72 +261,4 @@ export function toPublicDevice(device: UserDeviceRecord): PublicDevice {
     platform: device.platform,
     revokedAt: device.revokedAt,
   };
-}
-
-/**
- * 查找或创建开发期微信身份。
- *
- * @param code 微信登录 code，开发期作为 providerSubject 使用。
- */
-function findOrCreateWechatIdentity(code: string): AuthIdentityRecord {
-  const identityKey = `wechat_miniprogram:${code}`;
-  const existingIdentity = memoryStore.authIdentities.get(identityKey);
-
-  if (existingIdentity) {
-    return existingIdentity;
-  }
-
-  const user = createDefaultUserBundle();
-  const timestamp = nowIso();
-  const identity: AuthIdentityRecord = {
-    createdAt: timestamp,
-    id: randomUUID(),
-    provider: "wechat_miniprogram",
-    providerSubject: code,
-    unionSubject: null,
-    updatedAt: timestamp,
-    userId: user.id,
-  };
-
-  memoryStore.authIdentities.set(identityKey, identity);
-
-  return identity;
-}
-
-/**
- * 创建或恢复同一用户下的设备会话。
- *
- * @param userId 用户 ID。
- * @param input 登录请求中的设备信息。
- */
-function upsertDevice(userId: string, input: WechatLoginInput): UserDeviceRecord {
-  const deviceKeyHash = sha256(input.deviceKey);
-  const timestamp = nowIso();
-  const existingDevice = [...memoryStore.devices.values()].find(device =>
-    device.userId === userId && device.deviceKeyHash === deviceKeyHash
-  );
-
-  if (existingDevice) {
-    existingDevice.deviceName = input.deviceName ?? existingDevice.deviceName;
-    existingDevice.lastSeenAt = timestamp;
-    existingDevice.platform = input.platform;
-    existingDevice.revokedAt = null;
-    return existingDevice;
-  }
-
-  const device: UserDeviceRecord = {
-    createdAt: timestamp,
-    deviceKeyHash,
-    deviceName: input.deviceName ?? null,
-    id: randomUUID(),
-    lastSeenAt: timestamp,
-    platform: input.platform,
-    refreshTokenHash: null,
-    revokedAt: null,
-    userId,
-  };
-
-  memoryStore.devices.set(device.id, device);
-
-  return device;
 }

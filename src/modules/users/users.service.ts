@@ -5,7 +5,7 @@ import { nowIso } from "../../common/utils/date-time";
 import { memoryStore, type UserDeviceRecord } from "../../infrastructure/database/memory-store";
 import { appendAuditLog } from "../audit/audit.service";
 import { requireActiveSession, toPublicDevice, toPublicUserProfile } from "../auth/auth.service";
-import { replayOrRunMutation } from "../sync/idempotency.service";
+import { replayOrRunMutation, replayOrRunMutationAsync } from "../sync/idempotency.service";
 import { appendSyncChange } from "../sync/sync-log.service";
 import type { RevokeDeviceInput, UpdateUserProfileInput } from "./users.dto";
 
@@ -14,8 +14,8 @@ import type { RevokeDeviceInput, UpdateUserProfileInput } from "./users.dto";
  *
  * @param currentSession 当前用户与设备会话。
  */
-export function getCurrentUserProfile(currentSession: CurrentSession) {
-  const session = requireActiveSession(currentSession);
+export async function getCurrentUserProfile(currentSession: CurrentSession) {
+  const session = await requireActiveSession(currentSession);
 
   return {
     profile: toPublicUserProfile(session.user, session.profile),
@@ -30,8 +30,8 @@ export function getCurrentUserProfile(currentSession: CurrentSession) {
  * @param currentSession 当前用户与设备会话。
  * @param input 更新资料 DTO。
  */
-export function updateCurrentUserProfile(currentSession: CurrentSession, input: UpdateUserProfileInput) {
-  const session = requireActiveSession(currentSession);
+export async function updateCurrentUserProfile(currentSession: CurrentSession, input: UpdateUserProfileInput) {
+  const session = await requireActiveSession(currentSession);
 
   return replayOrRunMutation(session.user.id, input.clientMutationId, () => {
     const profile = session.profile;
@@ -77,8 +77,8 @@ export function updateCurrentUserProfile(currentSession: CurrentSession, input: 
  *
  * @param currentSession 当前用户与设备会话。
  */
-export function listCurrentUserDevices(currentSession: CurrentSession) {
-  const session = requireActiveSession(currentSession);
+export async function listCurrentUserDevices(currentSession: CurrentSession) {
+  const session = await requireActiveSession(currentSession);
   const devices = [...memoryStore.devices.values()]
     .filter(device => device.userId === session.user.id)
     .sort(sortDevicesByCreatedAtDesc)
@@ -95,10 +95,10 @@ export function listCurrentUserDevices(currentSession: CurrentSession) {
  * @param currentSession 当前用户与设备会话。
  * @param input 注销设备 DTO。
  */
-export function revokeUserDevice(currentSession: CurrentSession, input: RevokeDeviceInput) {
-  const session = requireActiveSession(currentSession);
+export async function revokeUserDevice(currentSession: CurrentSession, input: RevokeDeviceInput) {
+  const session = await requireActiveSession(currentSession);
 
-  return replayOrRunMutation(session.user.id, input.clientMutationId, () => {
+  return replayOrRunMutationAsync(session.user.id, input.clientMutationId, async () => {
     const device = memoryStore.devices.get(input.payload.deviceId);
 
     if (!device || device.userId !== session.user.id) {
@@ -111,7 +111,7 @@ export function revokeUserDevice(currentSession: CurrentSession, input: RevokeDe
 
     device.revokedAt = nowIso();
     device.refreshTokenHash = null;
-    appendAuditLog({
+    await appendAuditLog({
       action: "user_device.revoke",
       deviceId: session.device.id,
       resourceId: device.id,

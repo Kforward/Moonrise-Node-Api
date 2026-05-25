@@ -27,8 +27,8 @@ interface PeriodRecordDraft {
  *
  * @param currentSession 当前用户与设备会话。
  */
-export function getCycleSettings(currentSession: CurrentSession) {
-  const session = requireActiveSession(currentSession);
+export async function getCycleSettings(currentSession: CurrentSession) {
+  const session = await requireActiveSession(currentSession);
   const settings = memoryStore.cycleSettings.get(session.user.id);
 
   return {
@@ -42,8 +42,8 @@ export function getCycleSettings(currentSession: CurrentSession) {
  * @param currentSession 当前用户与设备会话。
  * @param input 周期设置更新 DTO。
  */
-export function updateCycleSettings(currentSession: CurrentSession, input: UpdateCycleSettingsInput) {
-  const session = requireActiveSession(currentSession);
+export async function updateCycleSettings(currentSession: CurrentSession, input: UpdateCycleSettingsInput) {
+  const session = await requireActiveSession(currentSession);
   const settings = memoryStore.cycleSettings.get(session.user.id);
 
   if (!settings) {
@@ -84,8 +84,8 @@ export function updateCycleSettings(currentSession: CurrentSession, input: Updat
  * @param currentSession 当前用户与设备会话。
  * @param query 分页查询参数。
  */
-export function listPeriodRecords(currentSession: CurrentSession, query: ListPeriodRecordsQuery) {
-  const session = requireActiveSession(currentSession);
+export async function listPeriodRecords(currentSession: CurrentSession, query: ListPeriodRecordsQuery) {
+  const session = await requireActiveSession(currentSession);
   const sortedRecords = [...memoryStore.periodRecords.values()]
     .filter(record => record.userId === session.user.id && !record.deletedAt)
     .sort(sortPeriodRecordsByCreatedAtDesc);
@@ -106,8 +106,8 @@ export function listPeriodRecords(currentSession: CurrentSession, query: ListPer
  * @param currentSession 当前用户与设备会话。
  * @param input 新增记录 DTO。
  */
-export function createPeriodRecord(currentSession: CurrentSession, input: CreatePeriodRecordInput) {
-  const session = requireActiveSession(currentSession);
+export async function createPeriodRecord(currentSession: CurrentSession, input: CreatePeriodRecordInput) {
+  const session = await requireActiveSession(currentSession);
 
   return replayOrRunMutation(session.user.id, input.clientMutationId, () => {
     const draft = {
@@ -157,8 +157,8 @@ export function createPeriodRecord(currentSession: CurrentSession, input: Create
  * @param currentSession 当前用户与设备会话。
  * @param input 更新记录 DTO。
  */
-export function updatePeriodRecord(currentSession: CurrentSession, input: UpdatePeriodRecordInput) {
-  const session = requireActiveSession(currentSession);
+export async function updatePeriodRecord(currentSession: CurrentSession, input: UpdatePeriodRecordInput) {
+  const session = await requireActiveSession(currentSession);
 
   return replayOrRunMutation(session.user.id, input.clientMutationId, () => {
     const record = findOwnedActiveRecord(session.user.id, input.payload.id);
@@ -202,8 +202,8 @@ export function updatePeriodRecord(currentSession: CurrentSession, input: Update
  * @param currentSession 当前用户与设备会话。
  * @param input 删除记录 DTO。
  */
-export function deletePeriodRecord(currentSession: CurrentSession, input: DeletePeriodRecordInput) {
-  const session = requireActiveSession(currentSession);
+export async function deletePeriodRecord(currentSession: CurrentSession, input: DeletePeriodRecordInput) {
+  const session = await requireActiveSession(currentSession);
 
   return replayOrRunMutation(session.user.id, input.clientMutationId, () => {
     const record = findOwnedActiveRecord(session.user.id, input.payload.id);
@@ -233,8 +233,8 @@ export function deletePeriodRecord(currentSession: CurrentSession, input: Delete
  * @param currentSession 当前用户与设备会话。
  * @param input 完成记录 DTO。
  */
-export function finishPeriodRecord(currentSession: CurrentSession, input: FinishPeriodRecordInput) {
-  const session = requireActiveSession(currentSession);
+export async function finishPeriodRecord(currentSession: CurrentSession, input: FinishPeriodRecordInput) {
+  const session = await requireActiveSession(currentSession);
 
   return replayOrRunMutation(session.user.id, input.clientMutationId, () => {
     const record = findOwnedActiveRecord(session.user.id, input.payload.id);
