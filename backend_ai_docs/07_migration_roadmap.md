@@ -37,7 +37,8 @@
 7. 已完成：为 `auth` 接入 repository 抽象、内存实现和 PostgreSQL 实现；认证审计日志可在 PostgreSQL 模式写入 `audit_logs`。
 8. 已完成：为 `users` 接入 repository 抽象、内存实现和 PostgreSQL 实现；用户资料同步日志可在 PostgreSQL 模式写入 `sync_change_logs`。
 9. 已完成：为 `cycle` 接入 repository 抽象、内存实现和 PostgreSQL 实现；周期设置与经期记录同步日志可在 PostgreSQL 模式写入 `sync_change_logs`。
-10. 下一步：把 `sync` 剩余内存读写替换为 PostgreSQL repository，并补齐生产级微信登录与测试覆盖。
+10. 已完成：为 `sync` 接入 repository 抽象、内存实现和 PostgreSQL 实现；同步日志写入、增量拉取和同步水位读取已统一走仓储。幂等响应快照已先收敛到 repository，PostgreSQL 模式暂用进程内快照，后续可补专用持久化表。
+11. 下一步：补齐生产级微信登录、幂等持久化快照表与测试覆盖。
 
 ### 5.2 第二阶段
 
@@ -65,7 +66,7 @@
 
 ## 7. 当前最高优先级
 
-- 将开发期内存仓储逐模块替换为 PostgreSQL/Drizzle repository，当前优先顺序为 `sync`。
+- 补齐 PostgreSQL 幂等响应快照持久化能力，替换当前 PostgreSQL 模式下的进程内响应快照。
 - 接入真实微信登录，替换开发期 code mock providerSubject。
 - 为周期记录重叠校验、幂等写入、token 刷新、同步日志补测试。
 - 继续落地 `sync/push`、`backup`、`privacy` 的真实业务实现。

@@ -1,20 +1,10 @@
-import { requireActiveSession } from "../auth/auth.service";
 import type { CurrentSession } from "../../common/types/current-session";
 import { nowIso } from "../../common/utils/date-time";
 import { sha256 } from "../../common/utils/hash";
-import { and, asc, desc, eq, gt } from "drizzle-orm";
-import { getDatabaseConfig } from "../../infrastructure/config/database.config";
-import { getDatabase } from "../../infrastructure/database/postgres-client";
-import { syncChangeLogs } from "../../infrastructure/database/schema";
-import {
-  memoryStore,
-  type SyncChangeLogRecord,
-  type SyncEntityType,
-  type SyncOperation,
-} from "../../infrastructure/database/memory-store";
+import type { SyncChangeLogRecord, SyncEntityType, SyncOperation } from "../../infrastructure/database/memory-store";
+import { requireActiveSession } from "../auth/auth.service";
 import type { ListSyncChangesQuery } from "./sync.dto";
-
-type SyncChangeLogRow = typeof syncChangeLogs.$inferSelect;
+import { getSyncRepository } from "./sync.repository";
 
 /**
  * 同步变更日志写入参数。
@@ -42,26 +32,22 @@ export interface AppendSyncChangeInput {
  * 所有影响前端跨设备同步的结构化实体写入，都应通过该函数生成同步日志。
  *
  * @param input 同步变更输入。
- * @returns 已写入内存存储的同步变更日志。
+ * @returns 已写入的同步变更日志。
  */
-export function appendSyncChange(input: AppendSyncChangeInput): SyncChangeLogRecord {
+export async function appendSyncChange(input: AppendSyncChangeInput): Promise<SyncChangeLogRecord> {
   const createdAt = nowIso();
-  const syncChange: SyncChangeLogRecord = {
+  const syncRepository = getSyncRepository();
+
+  return syncRepository.appendChange({
     checksum: buildChangeChecksum(input, createdAt),
     clientMutationId: input.clientMutationId ?? null,
     createdAt,
     entityId: input.entityId,
     entityType: input.entityType,
     entityVersion: input.entityVersion ?? null,
-    id: memoryStore.nextSyncChangeId,
     operation: input.operation,
     userId: input.userId,
-  };
-
-  memoryStore.nextSyncChangeId += 1;
-  memoryStore.syncChangeLogs.push(syncChange);
-
-  return syncChange;
+  });
 }
 
 /**
@@ -74,10 +60,6 @@ export function appendSyncChange(input: AppendSyncChangeInput): SyncChangeLogRec
  * @returns 已写入的同步变更日志。
  */
 export async function appendSyncChangeAsync(input: AppendSyncChangeInput): Promise<SyncChangeLogRecord> {
-  if (getDatabaseConfig().driver === "postgresql") {
-    return appendPostgresSyncChange(input);
-  }
-
   return appendSyncChange(input);
 }
 
@@ -91,33 +73,7 @@ export async function appendSyncChangeAsync(input: AppendSyncChangeInput): Promi
 export async function listSyncChanges(currentSession: CurrentSession, query: ListSyncChangesQuery) {
   const session = await requireActiveSession(currentSession);
 
-  if (getDatabaseConfig().driver === "postgresql") {
-    const items = await getDatabase()
-      .select()
-      .from(syncChangeLogs)
-      .where(and(
-        eq(syncChangeLogs.userId, session.user.id),
-        gt(syncChangeLogs.id, query.afterVersion),
-      ))
-      .orderBy(asc(syncChangeLogs.id))
-      .limit(query.limit);
-    const mappedItems = items.map(toSyncChangeLogRecord);
-
-    return {
-      items: mappedItems,
-      nextVersion: mappedItems.at(-1)?.id ?? query.afterVersion,
-    };
-  }
-
-  const items = memoryStore.syncChangeLogs
-    .filter(change => change.userId === session.user.id && change.id > query.afterVersion)
-    .sort((left, right) => left.id - right.id)
-    .slice(0, query.limit);
-
-  return {
-    items,
-    nextVersion: items.at(-1)?.id ?? query.afterVersion,
-  };
+  return getSyncRepository().listChanges(session.user.id, query);
 }
 
 /**
@@ -128,72 +84,10 @@ export async function listSyncChanges(currentSession: CurrentSession, query: Lis
  */
 export async function getSyncState(currentSession: CurrentSession) {
   const session = await requireActiveSession(currentSession);
-
-  if (getDatabaseConfig().driver === "postgresql") {
-    const [latestChange] = await getDatabase()
-      .select()
-      .from(syncChangeLogs)
-      .where(eq(syncChangeLogs.userId, session.user.id))
-      .orderBy(desc(syncChangeLogs.id))
-      .limit(1);
-
-    return {
-      latestVersion: latestChange?.id ?? 0,
-    };
-  }
-
-  const latestChange = [...memoryStore.syncChangeLogs]
-    .filter(change => change.userId === session.user.id)
-    .sort((left, right) => right.id - left.id)[0];
+  const latestVersion = await getSyncRepository().getLatestVersion(session.user.id);
 
   return {
-    latestVersion: latestChange?.id ?? 0,
-  };
-}
-
-/**
- * 写入 PostgreSQL 同步变更日志。
- *
- * @param input 同步变更输入。
- * @returns 数据库同步变更记录。
- */
-async function appendPostgresSyncChange(input: AppendSyncChangeInput): Promise<SyncChangeLogRecord> {
-  const createdAt = nowIso();
-  const [syncChange] = await getDatabase().insert(syncChangeLogs).values({
-    checksum: buildChangeChecksum(input, createdAt),
-    clientMutationId: input.clientMutationId ?? null,
-    createdAt,
-    entityId: input.entityId,
-    entityType: input.entityType,
-    entityVersion: input.entityVersion ?? null,
-    operation: input.operation,
-    userId: input.userId,
-  }).returning();
-
-  if (!syncChange) {
-    throw new Error("写入同步变更日志失败");
-  }
-
-  return toSyncChangeLogRecord(syncChange);
-}
-
-/**
- * 转换数据库同步变更日志记录。
- *
- * @param row Drizzle 同步变更行。
- * @returns service 层使用的同步变更记录。
- */
-function toSyncChangeLogRecord(row: SyncChangeLogRow): SyncChangeLogRecord {
-  return {
-    checksum: row.checksum,
-    clientMutationId: row.clientMutationId,
-    createdAt: row.createdAt,
-    entityId: row.entityId,
-    entityType: row.entityType,
-    entityVersion: row.entityVersion,
-    id: row.id,
-    operation: row.operation,
-    userId: row.userId,
+    latestVersion,
   };
 }
 

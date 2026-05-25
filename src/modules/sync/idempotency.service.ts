@@ -1,5 +1,5 @@
 import { nowIso } from "../../common/utils/date-time";
-import { memoryStore } from "../../infrastructure/database/memory-store";
+import { getIdempotencyRepository } from "./idempotency.repository";
 
 /**
  * 处理客户端幂等写入。
@@ -10,26 +10,14 @@ import { memoryStore } from "../../infrastructure/database/memory-store";
  * @param userId 用户 ID。
  * @param clientMutationId 客户端幂等键。
  * @param run 首次提交时执行的写入逻辑。
+ * @returns 首次写入响应快照，或重复提交时的历史响应快照。
  */
-export function replayOrRunMutation<TResponse>(userId: string, clientMutationId: string, run: () => TResponse): TResponse {
-  const mutationKey = `${userId}:${clientMutationId}`;
-  const existingMutation = memoryStore.mutations.get(mutationKey);
-
-  if (existingMutation) {
-    return cloneMutationResponse(existingMutation.response as TResponse);
-  }
-
-  const response = run();
-  const responseSnapshot = cloneMutationResponse(response);
-
-  memoryStore.mutations.set(mutationKey, {
-    clientMutationId,
-    createdAt: nowIso(),
-    response: responseSnapshot,
-    userId,
-  });
-
-  return cloneMutationResponse(responseSnapshot);
+export async function replayOrRunMutation<TResponse>(
+  userId: string,
+  clientMutationId: string,
+  run: () => TResponse,
+): Promise<TResponse> {
+  return replayOrRunMutationAsync(userId, clientMutationId, async () => run());
 }
 
 /**
@@ -48,8 +36,8 @@ export async function replayOrRunMutationAsync<TResponse>(
   clientMutationId: string,
   run: () => Promise<TResponse>,
 ): Promise<TResponse> {
-  const mutationKey = `${userId}:${clientMutationId}`;
-  const existingMutation = memoryStore.mutations.get(mutationKey);
+  const idempotencyRepository = getIdempotencyRepository();
+  const existingMutation = await idempotencyRepository.findMutation(userId, clientMutationId);
 
   if (existingMutation) {
     return cloneMutationResponse(existingMutation.response as TResponse);
@@ -58,7 +46,7 @@ export async function replayOrRunMutationAsync<TResponse>(
   const response = await run();
   const responseSnapshot = cloneMutationResponse(response);
 
-  memoryStore.mutations.set(mutationKey, {
+  await idempotencyRepository.saveMutation({
     clientMutationId,
     createdAt: nowIso(),
     response: responseSnapshot,
@@ -75,6 +63,7 @@ export async function replayOrRunMutationAsync<TResponse>(
  * 否则重复提交可能拿到已经被后续请求改变过的对象引用。
  *
  * @param response 即将写入或读出的幂等响应。
+ * @returns 可安全缓存或返回给调用方的响应深拷贝。
  */
 function cloneMutationResponse<TResponse>(response: TResponse): TResponse {
   return structuredClone(response);
