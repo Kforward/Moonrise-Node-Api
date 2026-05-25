@@ -1,29 +1,21 @@
 module.exports = {
   apps: [{
-    "name": "koa-api",
+    "name": "moonrise-node-api",
     "cwd": "./",
-    "script": "./src/main.js",
+    "script": "./dist/main.js",
     "log_date_format": "YYYY-MM-DD HH:mm Z",
     "error": "./logs/node-app.stderr.log",
     "output": "./logs/node-app.stdout.log",
-    "instances": 6,
+    "instances": 1,
     "min_uptime": "200s",
     "max_restarts": 10,
-    "max_memory_restart": "1M",
+    "max_memory_restart": "512M",
     "cron_restart": "1 0 * * *",
-    "watch": [
-      "bin",
-      "utils",
-      "controllers",
-      "models",
-      "public",
-      "routes",
-      "views"
-    ],
+    "watch": false,
     "merge_logs": true,
     "exec_interpreter": "node",
     "exec_mode": "fork",
-    "autorestart": false,
+    "autorestart": true,
     "vizion": false
   }],
 
@@ -31,7 +23,7 @@ module.exports = {
     production: {
       user: "SSH_USERNAME",
       host: "SSH_HOSTMACHINE",
-      ref: "origin/master",
+      ref: "origin/main",
       repo: "GIT_REPOSITORY",
       path: "DESTINATION_PATH",
       "pre-deploy-local": "",

@@ -1391,6 +1391,23 @@ app.use接收的时候一个函数
 
 本目录下的 `backend_ai_docs/` 用于承载未来 Node.js 后端项目的 AI 开发文档。它与当前小程序工程保持分离，后续可以整体迁移到独立后端仓库中使用。
 
+## 当前运行骨架
+
+当前项目已进入第一轮“骨架重构 + 依赖清理 + 目录重排”阶段，运行骨架采用 Node.js + TypeScript + Fastify。
+
+```bash
+npm install
+npm run dev
+```
+
+健康检查：
+
+```bash
+GET http://localhost:8000/api/v1/health
+```
+
+当前 `src/` 目录按照 `common / infrastructure / modules / database` 分层组织；旧 Koa、MySQL、Sequelize、商品上传、账号密码 demo 和 WebSocket demo 已从运行骨架中移除。后续业务实现请优先阅读 `backend_ai_docs/07_migration_roadmap.md`。
+
 ## 文档地图
 
 1. `backend_ai_docs/00_backend_prd.md`：后端产品范围、当前小程序功能映射、阶段目标。
@@ -1400,7 +1417,8 @@ app.use接收的时候一个函数
 5. `backend_ai_docs/04_database_design.md`：数据库表设计、字段说明、索引与约束。
 6. `backend_ai_docs/05_security_design.md`：数据安全、加密、认证、审计和恢复策略。
 7. `backend_ai_docs/06_ai_dev_rules.md`：迁移到后端项目后给 AI 使用的开发规则。
-8. `backend_ai_docs/database/001_initial_schema.sql`：PostgreSQL 建表草案。
+8. `backend_ai_docs/07_migration_roadmap.md`：当前仓库改造成正式后端项目的保留、替换、删除和优先级路线。
+9. `backend_ai_docs/database/001_initial_schema.sql`：PostgreSQL 建表草案。
 
 ## 当前设计基准
 
@@ -1412,8 +1430,7 @@ app.use接收的时候一个函数
 
 ## 迁移方式
 
-将整个 `backend_ai_docs/` 复制到后端仓库根目录。后端 Codex 或其他 AI 进入后端项目时，应优先阅读本文件，再阅读 `backend_ai_docs/00_backend_prd.md` 和 `backend_ai_docs/06_ai_dev_rules.md`。
-
+将整个 `backend_ai_docs/` 复制到后端仓库根目录。后端 Codex 或其他 AI 进入后端项目时，应优先阅读本文件，再阅读 `backend_ai_docs/07_migration_roadmap.md`、`backend_ai_docs/00_backend_prd.md` 和 `backend_ai_docs/06_ai_dev_rules.md`。
 
 
 

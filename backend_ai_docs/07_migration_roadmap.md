@@ -28,10 +28,10 @@
 
 ### 5.1 第一阶段
 
-1. 重整项目目录结构，建立后端正式骨架。
-2. 切换数据库与配置方式，去除硬编码。
-3. 搭建统一响应、统一错误、请求 ID 和日志规范。
-4. 落地 `auth`、`users`、`cycle settings`、`period records` 的基础接口。
+1. 已完成：重整项目目录结构，建立 Node.js + TypeScript + Fastify 后端正式骨架。
+2. 已完成：切换配置方式，移除 MySQL + Sequelize 示例数据层和硬编码数据库账号密码。
+3. 已完成：搭建统一响应、统一错误、请求 ID、健康检查和模块路由骨架。
+4. 下一步：落地 `auth`、`users`、`cycle settings`、`period records` 的数据层、DTO 校验和基础接口。
 
 ### 5.2 第二阶段
 
