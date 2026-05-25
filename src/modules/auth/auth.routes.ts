@@ -9,7 +9,7 @@ import { refreshTokenSchema, wechatLoginSchema } from "./auth.dto";
 /**
  * 注册认证模块路由。
  *
- * 第一阶段先提供开发期微信登录、token 刷新、当前会话读取和设备退出能力。
+ * 该模块提供微信登录、token 刷新、当前会话读取和设备退出能力。
  *
  * @param app Fastify 应用实例。
  */

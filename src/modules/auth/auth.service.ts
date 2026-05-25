@@ -3,13 +3,14 @@ import { ERROR_CODES } from "../../common/errors/error-codes";
 import type { CurrentSession } from "../../common/types/current-session";
 import { nowIso } from "../../common/utils/date-time";
 import { sha256 } from "../../common/utils/hash";
+import { appEnv } from "../../infrastructure/config/env";
 import {
   type AppUserRecord,
   type UserDeviceRecord,
   type UserProfileRecord,
 } from "../../infrastructure/database/memory-store";
-import { appEnv } from "../../infrastructure/config/env";
 import { issueTokenPair, verifyRefreshToken } from "../../infrastructure/tokens/token.service";
+import { resolveWechatSessionIdentity } from "../../infrastructure/wechat/wechat-login.client";
 import { appendAuditLog } from "../audit/audit.service";
 import type { RefreshTokenInput, WechatLoginInput } from "./auth.dto";
 import { getAuthRepository, type AuthSessionBundle } from "./auth.repository";
@@ -37,26 +38,22 @@ export interface PublicUserProfile {
 }
 
 /**
- * 开发期微信登录。
+ * 微信小程序登录。
  *
- * 当前尚未接入微信服务端接口，先把 `code` 作为开发期 providerSubject 使用，保证
- * 前端可以先对接登录、设备会话和 token 刷新流程。
+ * 生产环境通过微信 `jscode2session` 将前端一次性 code 换成 openid；开发环境在没有
+ * 微信配置时仍可使用 mock 模式完成前端联调。微信 session key 不会落库，也不会返回给前端。
  *
  * @param input 微信登录请求 DTO。
  * @returns token、用户资料和设备信息。
- * @throws 生产环境尚未接入真实微信登录时抛出未实现错误。
+ * @throws 微信登录凭证无效、微信服务不可用或会话写入失败时抛出业务错误。
  */
 export async function loginWithWechat(input: WechatLoginInput) {
-  if (appEnv.nodeEnv === "production") {
-    throw new AppError({
-      code: ERROR_CODES.NOT_IMPLEMENTED,
-      message: "生产环境需要先接入真实微信登录换取 openid",
-      statusCode: 501,
-    });
-  }
-
   const authRepository = getAuthRepository();
-  const identity = await authRepository.findOrCreateWechatIdentity(input.code);
+  const wechatIdentity = await resolveWechatSessionIdentity(input.code);
+  const identity = await authRepository.findOrCreateWechatIdentity({
+    providerSubject: wechatIdentity.openId,
+    unionSubject: wechatIdentity.unionId,
+  });
   const device = await authRepository.upsertDevice(identity.userId, input);
   const tokenPair = issueTokenPair({
     deviceId: device.id,
@@ -76,7 +73,7 @@ export async function loginWithWechat(input: WechatLoginInput) {
     action: "auth.login",
     deviceId: device.id,
     metadata: {
-      developmentMock: true,
+      loginMode: appEnv.wechatLoginMode,
       provider: identity.provider,
     },
     resourceId: device.id,

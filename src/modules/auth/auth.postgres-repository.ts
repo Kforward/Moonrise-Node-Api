@@ -19,7 +19,12 @@ import {
   userProfiles,
 } from "../../infrastructure/database/schema";
 import type { WechatLoginInput } from "./auth.dto";
-import type { AuthRepository, AuthSessionLookup, UpdateDeviceSessionInput } from "./auth.repository";
+import type {
+  AuthRepository,
+  AuthSessionLookup,
+  UpdateDeviceSessionInput,
+  WechatIdentityBinding,
+} from "./auth.repository";
 
 type AppUserRow = typeof appUsers.$inferSelect;
 type AuthIdentityRow = typeof authIdentities.$inferSelect;
@@ -34,18 +39,40 @@ type UserDeviceInsert = typeof userDevices.$inferInsert;
  * 业务仓储会在后续步骤继续迁移到 PostgreSQL。
  */
 export const postgresAuthRepository: AuthRepository = {
-  async findOrCreateWechatIdentity(providerSubject: string): Promise<AuthIdentityRecord> {
+  /**
+   * 查找或创建 PostgreSQL 微信身份。
+   *
+   * 如果微信后续返回了此前没有的 unionid，会同步补齐到身份绑定表，便于未来支持
+   * 同一开放平台账号体系下的跨应用账号合并。
+   *
+   * @param identity 微信 openid 与可选 unionid。
+   * @returns 已存在或新创建的微信身份记录。
+   */
+  async findOrCreateWechatIdentity(identity: WechatIdentityBinding): Promise<AuthIdentityRecord> {
     const db = getDatabase();
     const [existingIdentity] = await db
       .select()
       .from(authIdentities)
       .where(and(
         eq(authIdentities.provider, "wechat_miniprogram"),
-        eq(authIdentities.providerSubject, providerSubject),
+        eq(authIdentities.providerSubject, identity.providerSubject),
       ))
       .limit(1);
 
     if (existingIdentity) {
+      if (!existingIdentity.unionSubject && identity.unionSubject) {
+        const [updatedIdentity] = await db
+          .update(authIdentities)
+          .set({
+            unionSubject: identity.unionSubject,
+            updatedAt: nowIso(),
+          })
+          .where(eq(authIdentities.id, existingIdentity.id))
+          .returning();
+
+        return toAuthIdentityRecord(assertRow(updatedIdentity, "更新微信 unionid 失败"));
+      }
+
       return toAuthIdentityRecord(existingIdentity);
     }
 
@@ -84,7 +111,8 @@ export const postgresAuthRepository: AuthRepository = {
         createdAt: timestamp,
         id: identityId,
         provider: "wechat_miniprogram",
-        providerSubject,
+        providerSubject: identity.providerSubject,
+        unionSubject: identity.unionSubject,
         updatedAt: timestamp,
         userId,
       }).returning();

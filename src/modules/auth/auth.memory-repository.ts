@@ -8,7 +8,12 @@ import {
   type UserDeviceRecord,
 } from "../../infrastructure/database/memory-store";
 import type { WechatLoginInput } from "./auth.dto";
-import type { AuthRepository, AuthSessionLookup, UpdateDeviceSessionInput } from "./auth.repository";
+import type {
+  AuthRepository,
+  AuthSessionLookup,
+  UpdateDeviceSessionInput,
+  WechatIdentityBinding,
+} from "./auth.repository";
 
 /**
  * 内存版认证仓储。
@@ -16,29 +21,40 @@ import type { AuthRepository, AuthSessionLookup, UpdateDeviceSessionInput } from
  * 该实现保留当前开发期行为，便于没有 PostgreSQL 的本地环境继续完成前端联调。
  */
 export const memoryAuthRepository: AuthRepository = {
-  async findOrCreateWechatIdentity(providerSubject: string): Promise<AuthIdentityRecord> {
-    const identityKey = `wechat_miniprogram:${providerSubject}`;
+  /**
+   * 查找或创建内存微信身份。
+   *
+   * @param identity 微信 openid 与可选 unionid。
+   * @returns 已存在或新创建的微信身份记录。
+   */
+  async findOrCreateWechatIdentity(identity: WechatIdentityBinding): Promise<AuthIdentityRecord> {
+    const identityKey = `wechat_miniprogram:${identity.providerSubject}`;
     const existingIdentity = memoryStore.authIdentities.get(identityKey);
 
     if (existingIdentity) {
+      if (!existingIdentity.unionSubject && identity.unionSubject) {
+        existingIdentity.unionSubject = identity.unionSubject;
+        existingIdentity.updatedAt = nowIso();
+      }
+
       return existingIdentity;
     }
 
     const user = createDefaultUserBundle();
     const timestamp = nowIso();
-    const identity: AuthIdentityRecord = {
+    const createdIdentity: AuthIdentityRecord = {
       createdAt: timestamp,
       id: randomUUID(),
       provider: "wechat_miniprogram",
-      providerSubject,
-      unionSubject: null,
+      providerSubject: identity.providerSubject,
+      unionSubject: identity.unionSubject,
       updatedAt: timestamp,
       userId: user.id,
     };
 
-    memoryStore.authIdentities.set(identityKey, identity);
+    memoryStore.authIdentities.set(identityKey, createdIdentity);
 
-    return identity;
+    return createdIdentity;
   },
 
   async findSession(currentSession): Promise<AuthSessionLookup> {

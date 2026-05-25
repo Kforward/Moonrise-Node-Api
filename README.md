@@ -1424,6 +1424,18 @@ DATABASE_DRIVER=postgresql
 DATABASE_URL=postgresql://moonrise:moonrise_password@localhost:5432/moonrise
 ```
 
+## 微信登录配置
+
+开发环境默认使用 `WECHAT_LOGIN_MODE=mock`，前端可继续用任意非空 `code` 联调登录流程。接入真实小程序登录时，请配置：
+
+```bash
+WECHAT_LOGIN_MODE=code2session
+WECHAT_MINIPROGRAM_APP_ID=your-miniprogram-appid
+WECHAT_MINIPROGRAM_APP_SECRET=your-miniprogram-secret
+```
+
+生产环境必须使用 `code2session`。后端会调用微信 `jscode2session` 换取 `openid` 并绑定账号；微信 `session_key` 不落库，也不会返回给前端。
+
 ## 文档地图
 
 1. `backend_ai_docs/00_backend_prd.md`：后端产品范围、当前小程序功能映射、阶段目标。

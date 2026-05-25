@@ -10,6 +10,13 @@ import type { WechatLoginInput } from "./auth.dto";
 import { memoryAuthRepository } from "./auth.memory-repository";
 import { postgresAuthRepository } from "./auth.postgres-repository";
 
+export interface WechatIdentityBinding {
+  /** 微信小程序 openid，作为第三方身份唯一主体。 */
+  providerSubject: string;
+  /** 微信开放平台 unionid；未满足下发条件时为空。 */
+  unionSubject: string | null;
+}
+
 export interface AuthSessionLookup {
   user: AppUserRecord | null;
   profile: UserProfileRecord | null;
@@ -47,10 +54,10 @@ export interface AuthRepository {
   /**
    * 查找或创建微信小程序身份。
    *
-   * @param providerSubject 微信 openid；开发期暂时使用登录 code 代替。
+   * @param identity 微信身份绑定信息。
    * @returns 已存在或新创建的第三方身份记录。
    */
-  findOrCreateWechatIdentity(providerSubject: string): Promise<AuthIdentityRecord>;
+  findOrCreateWechatIdentity(identity: WechatIdentityBinding): Promise<AuthIdentityRecord>;
 
   /**
    * 按 token 中的用户和设备 ID 查找会话聚合。

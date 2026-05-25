@@ -41,6 +41,8 @@
 | `POST` | `/api/v1/auth/logout` | 当前设备退出 |
 | `GET` | `/api/v1/auth/session` | 获取当前会话与设备状态 |
 
+`/auth/wechat/login` 在生产环境调用微信 `jscode2session`，用 `openid` 绑定后端账号；开发环境可通过 `WECHAT_LOGIN_MODE=mock` 保留本地联调。微信 `session_key` 只在登录解析阶段使用，不落库、不返回前端。
+
 ## 3. 用户资料
 
 | 方法 | 路径 | 说明 |
