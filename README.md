@@ -1408,6 +1408,22 @@ GET http://localhost:8000/api/v1/health
 
 当前 `src/` 目录按照 `common / infrastructure / modules / database` 分层组织；旧 Koa、MySQL、Sequelize、商品上传、账号密码 demo 和 WebSocket demo 已从运行骨架中移除。`auth / users / cycle` 已具备开发期基础接口、DTO 校验和内存仓储适配器，`sync_change_logs` 和审计日志也已接入内存适配器。后续业务实现请优先阅读 `backend_ai_docs/07_migration_roadmap.md`。
 
+## 数据库迁移
+
+当前默认使用 `DATABASE_DRIVER=memory`，便于前端本地联调不依赖 PostgreSQL。PostgreSQL/Drizzle 基础设施、schema 和初始迁移已接入，后续会逐步把 `auth / users / cycle / sync / audit` 仓储从内存适配器切到持久化适配器。
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+切换 PostgreSQL 前，请在 `.env` 中配置：
+
+```bash
+DATABASE_DRIVER=postgresql
+DATABASE_URL=postgresql://moonrise:moonrise_password@localhost:5432/moonrise
+```
+
 ## 文档地图
 
 1. `backend_ai_docs/00_backend_prd.md`：后端产品范围、当前小程序功能映射、阶段目标。
@@ -1431,7 +1447,6 @@ GET http://localhost:8000/api/v1/health
 ## 迁移方式
 
 将整个 `backend_ai_docs/` 复制到后端仓库根目录。后端 Codex 或其他 AI 进入后端项目时，应优先阅读本文件，再阅读 `backend_ai_docs/07_migration_roadmap.md`、`backend_ai_docs/00_backend_prd.md` 和 `backend_ai_docs/06_ai_dev_rules.md`。
-
 
 
 

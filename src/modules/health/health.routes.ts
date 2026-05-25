@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { buildSuccessResponse } from "../../common/responses/api-response";
 import { appEnv } from "../../infrastructure/config/env";
 import { getDatabaseConfig } from "../../infrastructure/config/database.config";
+import { checkPostgresConnection } from "../../infrastructure/database/postgres-client";
 import { BACKEND_MODULES } from "../module-catalog";
 
 /**
@@ -20,12 +21,18 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
  *
  * @param request 当前请求对象，用于取得请求 ID。
  */
-function buildHealthResponse(request: FastifyRequest) {
+async function buildHealthResponse(request: FastifyRequest) {
   const databaseConfig = getDatabaseConfig();
+  const postgresStatus = databaseConfig.driver === "postgresql"
+    ? await checkPostgresConnection()
+    : null;
 
   return buildSuccessResponse(request.id, {
     database: {
+      connected: postgresStatus?.connected ?? null,
       configured: databaseConfig.url !== null,
+      driver: databaseConfig.driver,
+      errorMessage: postgresStatus?.errorMessage ?? null,
       provider: databaseConfig.provider,
     },
     modules: BACKEND_MODULES,

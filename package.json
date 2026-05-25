@@ -11,6 +11,9 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "pm2": "pm2 start ecosystem.config.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
     "prepare": "husky install",
     "lint": "eslint --ext .ts src",
     "lint-staged": "lint-staged",
@@ -20,8 +23,10 @@
   "dependencies": {
     "@fastify/cors": "^9.0.1",
     "dotenv": "^16.0.1",
+    "drizzle-orm": "^0.45.2",
     "fastify": "^4.28.1",
     "jsonwebtoken": "^8.5.1",
+    "postgres": "^3.4.9",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -31,6 +36,7 @@
     "@types/node": "^20.14.10",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^8.57.0",
     "husky": "^8.0.2",
     "lint-staged": "^13.0.3",

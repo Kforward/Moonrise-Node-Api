@@ -8,6 +8,7 @@ const envSchema = z.object({
   APP_HOST: z.string().default("0.0.0.0"),
   APP_PORT: z.coerce.number().int().min(1).max(65535).default(8000),
   CORS_ORIGIN: z.string().default("*"),
+  DATABASE_DRIVER: z.enum(["memory", "postgresql"]).default("memory"),
   DATABASE_URL: z.string().url().optional(),
   JWT_ACCESS_SECRET: z.string().optional(),
   JWT_REFRESH_SECRET: z.string().optional(),
@@ -43,6 +44,7 @@ const parsedEnv = envSchema.parse(process.env);
 export const appEnv = Object.freeze({
   apiPrefix: parsedEnv.API_PREFIX,
   corsOrigin: parseCorsOrigin(parsedEnv.CORS_ORIGIN),
+  databaseDriver: parsedEnv.DATABASE_DRIVER,
   databaseUrl: parsedEnv.DATABASE_URL ?? null,
   host: parsedEnv.APP_HOST,
   jwtAccessSecret: parsedEnv.JWT_ACCESS_SECRET ?? null,
