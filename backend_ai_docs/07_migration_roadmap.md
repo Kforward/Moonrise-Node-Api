@@ -31,7 +31,8 @@
 1. 已完成：重整项目目录结构，建立 Node.js + TypeScript + Fastify 后端正式骨架。
 2. 已完成：切换配置方式，移除 MySQL + Sequelize 示例数据层和硬编码数据库账号密码。
 3. 已完成：搭建统一响应、统一错误、请求 ID、健康检查和模块路由骨架。
-4. 下一步：落地 `auth`、`users`、`cycle settings`、`period records` 的数据层、DTO 校验和基础接口。
+4. 已完成：落地 `auth`、`users`、`cycle settings`、`period records` 的开发期基础接口、DTO 校验和内存仓储适配器。
+5. 下一步：替换为 PostgreSQL/ORM 持久化仓储，并补齐 `sync_change_logs`、审计日志和生产级微信登录。
 
 ### 5.2 第二阶段
 
@@ -59,7 +60,8 @@
 
 ## 7. 当前最高优先级
 
-- 先把仓库从教程工程改成正式后端工程。
-- 先搭核心业务骨架，再补业务细节。
-- 先保留将来会用到的扩展点，后删除无用的 demo 代码。
+- 将开发期内存仓储替换为 PostgreSQL/ORM 持久化仓储。
+- 接入真实微信登录，替换开发期 code mock providerSubject。
+- 为 `auth`、`users`、`cycle` 写入 `sync_change_logs` 和必要审计日志。
+- 为周期记录重叠校验、幂等写入、token 刷新补测试。
 - 任何新增代码都要遵守中文注释与 JSDoc 规则。

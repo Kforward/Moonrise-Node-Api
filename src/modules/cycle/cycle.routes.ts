@@ -1,52 +1,81 @@
 import type { FastifyInstance } from "fastify";
-import { registerPlaceholderRoutes } from "../../common/utils/register-placeholder-routes";
+import { requireCurrentSession } from "../../common/middlewares/auth-context";
+import { buildSuccessResponse } from "../../common/responses/api-response";
+import { validateWithZod } from "../../common/validators/validate-with-zod";
 import { appEnv } from "../../infrastructure/config/env";
+import {
+  createPeriodRecord,
+  deletePeriodRecord,
+  finishPeriodRecord,
+  getCycleSettings,
+  listPeriodRecords,
+  updateCycleSettings,
+  updatePeriodRecord,
+} from "./cycle.service";
+import {
+  createPeriodRecordSchema,
+  deletePeriodRecordSchema,
+  finishPeriodRecordSchema,
+  listPeriodRecordsQuerySchema,
+  updateCycleSettingsSchema,
+  updatePeriodRecordSchema,
+} from "./cycle.dto";
 
 /**
- * 注册周期模块路由骨架。
+ * 注册周期模块路由。
  *
- * 该模块是第一阶段核心模块，后续负责周期设置、经期记录、重叠校验和软删除。
+ * 该模块负责周期设置、经期记录、重叠校验、幂等写入和软删除。
  *
  * @param app Fastify 应用实例。
  */
 export async function registerCycleRoutes(app: FastifyInstance): Promise<void> {
   const basePath = `${appEnv.apiPrefix}/cycle`;
 
-  await registerPlaceholderRoutes(app, "cycle", [
-    {
-      method: "GET",
-      nextStep: "读取当前用户的 cycle_settings",
-      path: `${basePath}/settings`,
-    },
-    {
-      method: "POST",
-      nextStep: "覆盖周期设置并写入 sync_change_logs",
-      path: `${basePath}/settings/update`,
-    },
-    {
-      method: "GET",
-      nextStep: "游标分页读取 period_records",
-      path: `${basePath}/records`,
-    },
-    {
-      method: "POST",
-      nextStep: "校验 clientMutationId 和日期区间后创建 period_records",
-      path: `${basePath}/records/create`,
-    },
-    {
-      method: "POST",
-      nextStep: "校验记录归属、重叠区间和幂等键后更新记录",
-      path: `${basePath}/records/update`,
-    },
-    {
-      method: "POST",
-      nextStep: "对经期记录执行软删除并写入同步日志",
-      path: `${basePath}/records/delete`,
-    },
-    {
-      method: "POST",
-      nextStep: "补充进行中记录的结束日期并执行重叠校验",
-      path: `${basePath}/records/finish`,
-    },
-  ]);
+  app.get(`${basePath}/settings`, async request => {
+    const currentSession = requireCurrentSession(request);
+
+    return buildSuccessResponse(request.id, getCycleSettings(currentSession));
+  });
+
+  app.post(`${basePath}/settings/update`, async request => {
+    const currentSession = requireCurrentSession(request);
+    const input = validateWithZod(updateCycleSettingsSchema, request.body);
+
+    return buildSuccessResponse(request.id, updateCycleSettings(currentSession, input));
+  });
+
+  app.get(`${basePath}/records`, async request => {
+    const currentSession = requireCurrentSession(request);
+    const query = validateWithZod(listPeriodRecordsQuerySchema, request.query);
+
+    return buildSuccessResponse(request.id, listPeriodRecords(currentSession, query));
+  });
+
+  app.post(`${basePath}/records/create`, async request => {
+    const currentSession = requireCurrentSession(request);
+    const input = validateWithZod(createPeriodRecordSchema, request.body);
+
+    return buildSuccessResponse(request.id, createPeriodRecord(currentSession, input));
+  });
+
+  app.post(`${basePath}/records/update`, async request => {
+    const currentSession = requireCurrentSession(request);
+    const input = validateWithZod(updatePeriodRecordSchema, request.body);
+
+    return buildSuccessResponse(request.id, updatePeriodRecord(currentSession, input));
+  });
+
+  app.post(`${basePath}/records/delete`, async request => {
+    const currentSession = requireCurrentSession(request);
+    const input = validateWithZod(deletePeriodRecordSchema, request.body);
+
+    return buildSuccessResponse(request.id, deletePeriodRecord(currentSession, input));
+  });
+
+  app.post(`${basePath}/records/finish`, async request => {
+    const currentSession = requireCurrentSession(request);
+    const input = validateWithZod(finishPeriodRecordSchema, request.body);
+
+    return buildSuccessResponse(request.id, finishPeriodRecord(currentSession, input));
+  });
 }

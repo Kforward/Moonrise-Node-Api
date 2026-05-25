@@ -1406,7 +1406,7 @@ npm run dev
 GET http://localhost:8000/api/v1/health
 ```
 
-当前 `src/` 目录按照 `common / infrastructure / modules / database` 分层组织；旧 Koa、MySQL、Sequelize、商品上传、账号密码 demo 和 WebSocket demo 已从运行骨架中移除。后续业务实现请优先阅读 `backend_ai_docs/07_migration_roadmap.md`。
+当前 `src/` 目录按照 `common / infrastructure / modules / database` 分层组织；旧 Koa、MySQL、Sequelize、商品上传、账号密码 demo 和 WebSocket demo 已从运行骨架中移除。`auth / users / cycle` 已具备开发期基础接口、DTO 校验和内存仓储适配器，后续业务实现请优先阅读 `backend_ai_docs/07_migration_roadmap.md`。
 
 ## 文档地图
 
@@ -1431,7 +1431,6 @@ GET http://localhost:8000/api/v1/health
 ## 迁移方式
 
 将整个 `backend_ai_docs/` 复制到后端仓库根目录。后端 Codex 或其他 AI 进入后端项目时，应优先阅读本文件，再阅读 `backend_ai_docs/07_migration_roadmap.md`、`backend_ai_docs/00_backend_prd.md` 和 `backend_ai_docs/06_ai_dev_rules.md`。
-
 
 
 

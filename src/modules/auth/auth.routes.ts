@@ -1,37 +1,42 @@
 import type { FastifyInstance } from "fastify";
-import { registerPlaceholderRoutes } from "../../common/utils/register-placeholder-routes";
+import { requireCurrentSession } from "../../common/middlewares/auth-context";
+import { buildSuccessResponse } from "../../common/responses/api-response";
+import { validateWithZod } from "../../common/validators/validate-with-zod";
 import { appEnv } from "../../infrastructure/config/env";
+import { getCurrentSession, loginWithWechat, logoutSession, refreshSession } from "./auth.service";
+import { refreshTokenSchema, wechatLoginSchema } from "./auth.dto";
 
 /**
- * 注册认证模块路由骨架。
+ * 注册认证模块路由。
  *
- * 第一阶段后续会在这里实现微信小程序登录、token 刷新、设备会话和退出登录。
+ * 第一阶段先提供开发期微信登录、token 刷新、当前会话读取和设备退出能力。
  *
  * @param app Fastify 应用实例。
  */
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   const basePath = `${appEnv.apiPrefix}/auth`;
 
-  await registerPlaceholderRoutes(app, "auth", [
-    {
-      method: "POST",
-      nextStep: "接入微信 code 换 openid，并创建 auth_identities 与 user_devices",
-      path: `${basePath}/wechat/login`,
-    },
-    {
-      method: "POST",
-      nextStep: "校验 refresh token 哈希并签发新的 access token",
-      path: `${basePath}/refresh`,
-    },
-    {
-      method: "POST",
-      nextStep: "注销当前设备会话并写入审计日志",
-      path: `${basePath}/logout`,
-    },
-    {
-      method: "GET",
-      nextStep: "解析当前 access token 并返回用户与设备会话状态",
-      path: `${basePath}/session`,
-    },
-  ]);
+  app.post(`${basePath}/wechat/login`, async request => {
+    const input = validateWithZod(wechatLoginSchema, request.body);
+
+    return buildSuccessResponse(request.id, loginWithWechat(input));
+  });
+
+  app.post(`${basePath}/refresh`, async request => {
+    const input = validateWithZod(refreshTokenSchema, request.body);
+
+    return buildSuccessResponse(request.id, refreshSession(input));
+  });
+
+  app.post(`${basePath}/logout`, async request => {
+    const currentSession = requireCurrentSession(request);
+
+    return buildSuccessResponse(request.id, logoutSession(currentSession));
+  });
+
+  app.get(`${basePath}/session`, async request => {
+    const currentSession = requireCurrentSession(request);
+
+    return buildSuccessResponse(request.id, getCurrentSession(currentSession));
+  });
 }
