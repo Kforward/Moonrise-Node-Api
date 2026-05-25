@@ -30,6 +30,7 @@
 | `encrypted_vault_items` | 端到端加密条目托管 |
 | `backup_snapshots` | 云端备份快照 |
 | `sync_change_logs` | 增量同步变更日志 |
+| `idempotency_records` | 写接口幂等响应快照 |
 | `audit_logs` | 安全与恢复审计日志 |
 | `app_releases` | 可选的应用更新日志 |
 | `app_release_entries` | 可选的更新日志条目明细 |
@@ -48,6 +49,7 @@ erDiagram
   app_users ||--o{ encrypted_vault_items : stores
   app_users ||--o{ backup_snapshots : creates
   app_users ||--o{ sync_change_logs : produces
+  app_users ||--o{ idempotency_records : owns
   app_users ||--o{ audit_logs : produces
   app_releases ||--o{ app_release_entries : contains
 ```
@@ -192,7 +194,18 @@ erDiagram
 | `client_mutation_id` | `varchar(120)` | 客户端幂等 ID |
 | `checksum` | `text` | 变更摘要 |
 
-### 4.12 `audit_logs`
+### 4.12 `idempotency_records`
+
+幂等响应快照表。写接口首次成功后保存响应快照，重复提交同一 `client_mutation_id` 时直接返回首次响应。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `user_id` | `uuid` | 用户 ID |
+| `client_mutation_id` | `varchar(120)` | 客户端幂等 ID |
+| `response` | `jsonb` | 首次处理成功后的响应快照 |
+| `created_at` | `timestamptz` | 快照创建时间 |
+
+### 4.13 `audit_logs`
 
 安全审计表，不保存敏感正文。
 
@@ -206,7 +219,7 @@ erDiagram
 | `user_agent_hash` | `text` | UA 哈希 |
 | `metadata` | `jsonb` | 非敏感元数据 |
 
-### 4.13 `app_releases` 与 `app_release_entries`
+### 4.14 `app_releases` 与 `app_release_entries`
 
 可选更新日志表。如果后续希望后端动态下发更新日志，可从当前前端静态 `src/utils/changelog.ts` 迁移。
 
@@ -234,8 +247,10 @@ erDiagram
 - `auth_identities(provider, provider_subject)` 唯一。
 - `period_records(user_id, client_record_id)` 唯一。
 - `sync_change_logs(user_id, client_mutation_id)` 唯一。
+- `idempotency_records(user_id, client_mutation_id)` 唯一。
 - `period_records(user_id, start_date)` 普通索引，用于日历和同步。
 - `backup_snapshots(user_id, created_at desc)` 普通索引。
+- `idempotency_records(user_id, created_at)` 普通索引，用于后续清理历史幂等快照。
 - 周期记录重叠校验建议在服务层完成；PostgreSQL 可后续升级为 daterange 排他约束。
 - `app_release_entries(release_id, sort_order)` 普通索引，用于更新日志按顺序展示。
 
@@ -249,5 +264,5 @@ erDiagram
 | 首页空状态/补录提示关闭 | `user_app_preferences` |
 | 本地备份快照 | `backup_snapshots` |
 | 隐私加密配置 | `privacy_configs`、`encrypted_vault_items` |
-| 跨设备同步 | `sync_change_logs` |
+| 跨设备同步 | `sync_change_logs`、`idempotency_records` |
 | 恢复和安全追踪 | `audit_logs` |

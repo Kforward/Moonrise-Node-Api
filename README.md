@@ -1410,7 +1410,7 @@ GET http://localhost:8000/api/v1/health
 
 ## 数据库迁移
 
-当前默认使用 `DATABASE_DRIVER=memory`，便于前端本地联调不依赖 PostgreSQL。PostgreSQL/Drizzle 基础设施、schema 和初始迁移已接入，`auth / users / cycle / sync` 已具备内存/PostgreSQL 双仓储实现，认证审计日志、用户资料同步日志、周期同步日志和增量同步读取可在 PostgreSQL 模式写入或读取对应数据表。幂等响应快照已先收敛到 repository，PostgreSQL 模式暂用进程内快照，后续可按需要补专用持久化表。
+当前默认使用 `DATABASE_DRIVER=memory`，便于前端本地联调不依赖 PostgreSQL。PostgreSQL/Drizzle 基础设施、schema 和迁移文件已接入，`auth / users / cycle / sync` 已具备内存/PostgreSQL 双仓储实现，认证审计日志、用户资料同步日志、周期同步日志、增量同步读取和幂等响应快照可在 PostgreSQL 模式写入或读取对应数据表。
 
 ```bash
 npm run db:generate

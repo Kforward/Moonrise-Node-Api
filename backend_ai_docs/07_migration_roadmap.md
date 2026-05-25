@@ -37,12 +37,13 @@
 7. 已完成：为 `auth` 接入 repository 抽象、内存实现和 PostgreSQL 实现；认证审计日志可在 PostgreSQL 模式写入 `audit_logs`。
 8. 已完成：为 `users` 接入 repository 抽象、内存实现和 PostgreSQL 实现；用户资料同步日志可在 PostgreSQL 模式写入 `sync_change_logs`。
 9. 已完成：为 `cycle` 接入 repository 抽象、内存实现和 PostgreSQL 实现；周期设置与经期记录同步日志可在 PostgreSQL 模式写入 `sync_change_logs`。
-10. 已完成：为 `sync` 接入 repository 抽象、内存实现和 PostgreSQL 实现；同步日志写入、增量拉取和同步水位读取已统一走仓储。幂等响应快照已先收敛到 repository，PostgreSQL 模式暂用进程内快照，后续可补专用持久化表。
-11. 下一步：补齐生产级微信登录、幂等持久化快照表与测试覆盖。
+10. 已完成：为 `sync` 接入 repository 抽象、内存实现和 PostgreSQL 实现；同步日志写入、增量拉取和同步水位读取已统一走仓储。
+11. 已完成：新增 `idempotency_records` 幂等响应快照表和 PostgreSQL 仓储实现，PostgreSQL 模式不再依赖进程内快照。
+12. 下一步：补齐生产级微信登录与测试覆盖。
 
 ### 5.2 第二阶段
 
-1. 落地 `sync_change_logs`、幂等写入和增量同步。
+1. 已完成：落地 `sync_change_logs`、幂等写入和增量同步。
 2. 落地 `backup_snapshots` 及恢复审计。
 3. 落地 `privacy_configs`、`encrypted_vault_items` 和密钥版本记录。
 
@@ -66,7 +67,6 @@
 
 ## 7. 当前最高优先级
 
-- 补齐 PostgreSQL 幂等响应快照持久化能力，替换当前 PostgreSQL 模式下的进程内响应快照。
 - 接入真实微信登录，替换开发期 code mock providerSubject。
 - 为周期记录重叠校验、幂等写入、token 刷新、同步日志补测试。
 - 继续落地 `sync/push`、`backup`、`privacy` 的真实业务实现。

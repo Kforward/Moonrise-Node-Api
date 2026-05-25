@@ -4,8 +4,8 @@ import { getIdempotencyRepository } from "./idempotency.repository";
 /**
  * 处理客户端幂等写入。
  *
- * 当前开发期实现保存首次响应快照并在重复提交时原样返回；后续 PostgreSQL 实现应使用
- * `sync_change_logs(user_id, client_mutation_id)` 唯一约束保证并发安全。
+ * 首次写入会保存响应快照，重复提交会直接返回历史响应；PostgreSQL 模式下快照保存在
+ * `idempotency_records`，内存模式下保存在当前进程缓存中。
  *
  * @param userId 用户 ID。
  * @param clientMutationId 客户端幂等键。
@@ -46,14 +46,14 @@ export async function replayOrRunMutationAsync<TResponse>(
   const response = await run();
   const responseSnapshot = cloneMutationResponse(response);
 
-  await idempotencyRepository.saveMutation({
+  const savedMutation = await idempotencyRepository.saveMutation({
     clientMutationId,
     createdAt: nowIso(),
     response: responseSnapshot,
     userId,
   });
 
-  return cloneMutationResponse(responseSnapshot);
+  return cloneMutationResponse(savedMutation.response as TResponse);
 }
 
 /**

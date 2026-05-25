@@ -17,8 +17,8 @@ export interface SaveMutationSnapshotData {
 /**
  * 幂等响应快照仓储接口。
  *
- * 该接口先收敛当前进程内快照能力；后续如果新增持久化幂等表，只需要替换 PostgreSQL
- * 实现，不需要改动业务 service。
+ * 内存模式用于前端本地联调，PostgreSQL 模式用于持久化保存首次响应快照；service 层只
+ * 依赖该接口，不直接关心底层存储方式。
  */
 export interface IdempotencyRepository {
   /**

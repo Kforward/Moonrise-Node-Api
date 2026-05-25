@@ -280,6 +280,23 @@ export const syncChangeLogs = pgTable("sync_change_logs", {
 ]);
 
 /**
+ * 幂等响应快照表。
+ *
+ * 写接口首次处理成功后会保存响应快照，后续相同用户、相同 `clientMutationId` 的重复提交
+ * 直接返回首次响应，避免前端重试、网络抖动或小程序重复触发导致响应不一致。
+ */
+export const idempotencyRecords = pgTable("idempotency_records", {
+  clientMutationId: varchar("client_mutation_id", { length: 120 }).notNull(),
+  createdAt: timestamptzColumn("created_at").notNull().defaultNow(),
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  response: jsonb("response").$type<unknown>().notNull(),
+  userId: uuid("user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+}, table => [
+  index("idempotency_records_user_created_idx").on(table.userId, table.createdAt),
+  uniqueIndex("idempotency_records_user_mutation_uidx").on(table.userId, table.clientMutationId),
+]);
+
+/**
  * 安全审计日志表。
  *
  * 该表只记录动作、资源定位和非敏感元数据，敏感 payload 不能进入审计日志。

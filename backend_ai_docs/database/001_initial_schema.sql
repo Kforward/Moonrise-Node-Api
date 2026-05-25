@@ -160,6 +160,17 @@ CREATE TABLE sync_change_logs (
 
 CREATE INDEX idx_sync_change_logs_user_id ON sync_change_logs(user_id, id);
 
+CREATE TABLE idempotency_records (
+  id bigserial PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  client_mutation_id varchar(120) NOT NULL,
+  response jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, client_mutation_id)
+);
+
+CREATE INDEX idx_idempotency_records_user_created ON idempotency_records(user_id, created_at);
+
 CREATE TABLE audit_logs (
   id bigserial PRIMARY KEY,
   user_id uuid REFERENCES app_users(id),
