@@ -5,6 +5,8 @@ import type { CurrentSession } from "../../common/types/current-session";
 import { nowIso } from "../../common/utils/date-time";
 import { memoryStore, type PeriodRecord } from "../../infrastructure/database/memory-store";
 import { requireActiveSession } from "../auth/auth.service";
+import { replayOrRunMutation } from "../sync/idempotency.service";
+import { appendSyncChange } from "../sync/sync-log.service";
 import type {
   CreatePeriodRecordInput,
   DeletePeriodRecordInput,
@@ -60,6 +62,13 @@ export function updateCycleSettings(currentSession: CurrentSession, input: Updat
     settings.reminderEnabled = input.payload.reminderEnabled;
     settings.reminderTime = input.payload.reminderTime;
     settings.updatedAt = nowIso();
+    appendSyncChange({
+      clientMutationId: input.clientMutationId,
+      entityId: session.user.id,
+      entityType: "cycle_settings",
+      operation: "update",
+      userId: session.user.id,
+    });
 
     return {
       settings,
@@ -127,6 +136,14 @@ export function createPeriodRecord(currentSession: CurrentSession, input: Create
     };
 
     memoryStore.periodRecords.set(record.id, record);
+    appendSyncChange({
+      clientMutationId: input.clientMutationId,
+      entityId: record.id,
+      entityType: "period_record",
+      entityVersion: record.version,
+      operation: "create",
+      userId: session.user.id,
+    });
 
     return {
       record,
@@ -164,6 +181,14 @@ export function updatePeriodRecord(currentSession: CurrentSession, input: Update
     record.clientUpdatedAt = input.payload.clientUpdatedAt ?? record.clientUpdatedAt;
     record.updatedAt = nowIso();
     record.version += 1;
+    appendSyncChange({
+      clientMutationId: input.clientMutationId,
+      entityId: record.id,
+      entityType: "period_record",
+      entityVersion: record.version,
+      operation: "update",
+      userId: session.user.id,
+    });
 
     return {
       record,
@@ -186,6 +211,14 @@ export function deletePeriodRecord(currentSession: CurrentSession, input: Delete
     record.deletedAt = nowIso();
     record.updatedAt = record.deletedAt;
     record.version += 1;
+    appendSyncChange({
+      clientMutationId: input.clientMutationId,
+      entityId: record.id,
+      entityType: "period_record",
+      entityVersion: record.version,
+      operation: "delete",
+      userId: session.user.id,
+    });
 
     return {
       recordId: record.id,
@@ -217,40 +250,19 @@ export function finishPeriodRecord(currentSession: CurrentSession, input: Finish
     record.clientUpdatedAt = input.payload.clientUpdatedAt ?? record.clientUpdatedAt;
     record.updatedAt = nowIso();
     record.version += 1;
+    appendSyncChange({
+      clientMutationId: input.clientMutationId,
+      entityId: record.id,
+      entityType: "period_record",
+      entityVersion: record.version,
+      operation: "update",
+      userId: session.user.id,
+    });
 
     return {
       record,
     };
   });
-}
-
-/**
- * 处理客户端幂等写入。
- *
- * 当前实现保存首次响应并在重复提交时原样返回；后续 PostgreSQL 实现应使用
- * `sync_change_logs(user_id, client_mutation_id)` 唯一约束保证并发安全。
- *
- * @param userId 用户 ID。
- * @param clientMutationId 客户端幂等键。
- * @param run 首次提交时执行的写入逻辑。
- */
-function replayOrRunMutation<TResponse>(userId: string, clientMutationId: string, run: () => TResponse): TResponse {
-  const mutationKey = `${userId}:${clientMutationId}`;
-  const existingMutation = memoryStore.mutations.get(mutationKey);
-
-  if (existingMutation) {
-    return existingMutation.response as TResponse;
-  }
-
-  const response = run();
-  memoryStore.mutations.set(mutationKey, {
-    clientMutationId,
-    createdAt: nowIso(),
-    response,
-    userId,
-  });
-
-  return response;
 }
 
 /**

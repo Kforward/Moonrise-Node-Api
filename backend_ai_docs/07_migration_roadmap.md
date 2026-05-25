@@ -32,7 +32,8 @@
 2. 已完成：切换配置方式，移除 MySQL + Sequelize 示例数据层和硬编码数据库账号密码。
 3. 已完成：搭建统一响应、统一错误、请求 ID、健康检查和模块路由骨架。
 4. 已完成：落地 `auth`、`users`、`cycle settings`、`period records` 的开发期基础接口、DTO 校验和内存仓储适配器。
-5. 下一步：替换为 PostgreSQL/ORM 持久化仓储，并补齐 `sync_change_logs`、审计日志和生产级微信登录。
+5. 已完成：为 `auth`、`users`、`cycle` 接入开发期 `sync_change_logs`、幂等写入和必要审计日志。
+6. 下一步：替换为 PostgreSQL/ORM 持久化仓储，并补齐生产级微信登录与测试覆盖。
 
 ### 5.2 第二阶段
 
@@ -62,6 +63,6 @@
 
 - 将开发期内存仓储替换为 PostgreSQL/ORM 持久化仓储。
 - 接入真实微信登录，替换开发期 code mock providerSubject。
-- 为 `auth`、`users`、`cycle` 写入 `sync_change_logs` 和必要审计日志。
-- 为周期记录重叠校验、幂等写入、token 刷新补测试。
+- 为周期记录重叠校验、幂等写入、token 刷新、同步日志补测试。
+- 继续落地 `sync/push`、`backup`、`privacy` 的真实业务实现。
 - 任何新增代码都要遵守中文注释与 JSDoc 规则。

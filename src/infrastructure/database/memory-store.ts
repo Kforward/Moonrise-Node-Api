@@ -79,23 +79,82 @@ export interface MutationRecord {
   createdAt: string;
 }
 
+/**
+ * 可参与前端增量同步的实体类型。
+ *
+ * 其中备份、隐私配置和保险箱实体当前还未开放接口，但保留枚举值便于后续模块接入
+ * `sync_change_logs` 时保持统一协议。
+ */
+export type SyncEntityType = "user_profile" | "cycle_settings" | "period_record" | "backup_snapshot" | "privacy_config" | "vault_item";
+
+/**
+ * 同步变更操作类型。
+ *
+ * 前端离线合并时依赖该字段判断应创建、覆盖、软删除还是恢复本地实体。
+ */
+export type SyncOperation = "create" | "update" | "delete" | "restore";
+
+/**
+ * 开发期同步变更日志记录。
+ *
+ * 该结构对应后续 PostgreSQL 中的 `sync_change_logs` 表，用于让前端按递增 ID
+ * 拉取当前用户的跨设备增量变更。
+ */
+export interface SyncChangeLogRecord {
+  id: number;
+  userId: string;
+  entityType: SyncEntityType;
+  entityId: string;
+  operation: SyncOperation;
+  entityVersion: number | null;
+  clientMutationId: string | null;
+  checksum: string | null;
+  createdAt: string;
+}
+
+/**
+ * 开发期审计日志记录。
+ *
+ * 审计日志只保存动作、资源定位和非敏感元数据，避免把手机号、邮箱、经期备注或密文正文
+ * 写入可检索日志。
+ */
+export interface AuditLogRecord {
+  id: number;
+  userId: string | null;
+  deviceId: string | null;
+  action: string;
+  resourceType: string | null;
+  resourceId: string | null;
+  success: boolean;
+  metadata: Record<string, string | number | boolean | null>;
+  createdAt: string;
+}
+
 export interface MemoryStore {
+  auditLogs: AuditLogRecord[];
   authIdentities: Map<string, AuthIdentityRecord>;
   cycleSettings: Map<string, CycleSettingsRecord>;
   devices: Map<string, UserDeviceRecord>;
   mutations: Map<string, MutationRecord>;
+  nextAuditLogId: number;
+  nextSyncChangeId: number;
   periodRecords: Map<string, PeriodRecord>;
   profiles: Map<string, UserProfileRecord>;
+  syncChangeLogs: SyncChangeLogRecord[];
   users: Map<string, AppUserRecord>;
 }
 
 export const memoryStore: MemoryStore = {
+  auditLogs: [],
   authIdentities: new Map(),
   cycleSettings: new Map(),
   devices: new Map(),
   mutations: new Map(),
+  nextAuditLogId: 1,
+  nextSyncChangeId: 1,
   periodRecords: new Map(),
   profiles: new Map(),
+  syncChangeLogs: [],
   users: new Map(),
 };
 

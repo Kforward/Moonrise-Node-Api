@@ -14,6 +14,7 @@ import {
 } from "../../infrastructure/database/memory-store";
 import { appEnv } from "../../infrastructure/config/env";
 import { issueTokenPair, verifyRefreshToken } from "../../infrastructure/tokens/token.service";
+import { appendAuditLog } from "../audit/audit.service";
 import type { RefreshTokenInput, WechatLoginInput } from "./auth.dto";
 
 export interface PublicDevice {
@@ -75,6 +76,17 @@ export function loginWithWechat(input: WechatLoginInput) {
     deviceId: device.id,
     userId: identity.userId,
   });
+  appendAuditLog({
+    action: "auth.login",
+    deviceId: device.id,
+    metadata: {
+      developmentMock: true,
+      provider: identity.provider,
+    },
+    resourceId: device.id,
+    resourceType: "user_device",
+    userId: identity.userId,
+  });
 
   return {
     accessToken: tokenPair.accessToken,
@@ -111,6 +123,13 @@ export function refreshSession(input: RefreshTokenInput) {
 
   session.device.refreshTokenHash = sha256(tokenPair.refreshToken);
   session.device.lastSeenAt = nowIso();
+  appendAuditLog({
+    action: "auth.refresh",
+    deviceId: session.device.id,
+    resourceId: session.device.id,
+    resourceType: "user_device",
+    userId: session.user.id,
+  });
 
   return {
     accessToken: tokenPair.accessToken,
@@ -130,6 +149,13 @@ export function logoutSession(currentSession: CurrentSession) {
 
   session.device.revokedAt = nowIso();
   session.device.refreshTokenHash = null;
+  appendAuditLog({
+    action: "auth.logout",
+    deviceId: session.device.id,
+    resourceId: session.device.id,
+    resourceType: "user_device",
+    userId: session.user.id,
+  });
 
   return {
     deviceId: session.device.id,

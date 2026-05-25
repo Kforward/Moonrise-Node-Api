@@ -1,32 +1,37 @@
 import type { FastifyInstance } from "fastify";
-import { registerPlaceholderRoutes } from "../../common/utils/register-placeholder-routes";
+import { createNotImplementedHandler } from "../../common/handlers/not-implemented-handler";
+import { requireCurrentSession } from "../../common/middlewares/auth-context";
+import { buildSuccessResponse } from "../../common/responses/api-response";
+import { validateWithZod } from "../../common/validators/validate-with-zod";
 import { appEnv } from "../../infrastructure/config/env";
+import { listSyncChangesQuerySchema } from "./sync.dto";
+import { getSyncState, listSyncChanges } from "./sync-log.service";
 
 /**
- * 注册同步模块路由骨架。
+ * 注册同步模块路由。
  *
- * 后续该模块负责增量变更、离线批量推送、幂等键和同步水位。
+ * 当前阶段先支持拉取同步日志和读取同步水位，批量离线推送后续再落地。
  *
  * @param app Fastify 应用实例。
  */
 export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
   const basePath = `${appEnv.apiPrefix}/sync`;
 
-  await registerPlaceholderRoutes(app, "sync", [
-    {
-      method: "GET",
-      nextStep: "根据 afterVersion 拉取 sync_change_logs 增量变更",
-      path: `${basePath}/changes`,
-    },
-    {
-      method: "POST",
-      nextStep: "批量处理离线变更并逐条校验 clientMutationId",
-      path: `${basePath}/push`,
-    },
-    {
-      method: "GET",
-      nextStep: "返回服务器同步水位和当前用户最新版本",
-      path: `${basePath}/state`,
-    },
-  ]);
+  app.get(`${basePath}/changes`, async request => {
+    const currentSession = requireCurrentSession(request);
+    const query = validateWithZod(listSyncChangesQuerySchema, request.query);
+
+    return buildSuccessResponse(request.id, listSyncChanges(currentSession, query));
+  });
+
+  app.post(`${basePath}/push`, createNotImplementedHandler(
+    "sync",
+    "批量处理离线变更并逐条校验 clientMutationId",
+  ));
+
+  app.get(`${basePath}/state`, async request => {
+    const currentSession = requireCurrentSession(request);
+
+    return buildSuccessResponse(request.id, getSyncState(currentSession));
+  });
 }

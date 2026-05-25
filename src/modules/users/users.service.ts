@@ -3,7 +3,10 @@ import { ERROR_CODES } from "../../common/errors/error-codes";
 import type { CurrentSession } from "../../common/types/current-session";
 import { nowIso } from "../../common/utils/date-time";
 import { memoryStore, type UserDeviceRecord } from "../../infrastructure/database/memory-store";
+import { appendAuditLog } from "../audit/audit.service";
 import { requireActiveSession, toPublicDevice, toPublicUserProfile } from "../auth/auth.service";
+import { replayOrRunMutation } from "../sync/idempotency.service";
+import { appendSyncChange } from "../sync/sync-log.service";
 import type { RevokeDeviceInput, UpdateUserProfileInput } from "./users.dto";
 
 /**
@@ -29,34 +32,44 @@ export function getCurrentUserProfile(currentSession: CurrentSession) {
  */
 export function updateCurrentUserProfile(currentSession: CurrentSession, input: UpdateUserProfileInput) {
   const session = requireActiveSession(currentSession);
-  const profile = session.profile;
-  const timestamp = nowIso();
 
-  if (input.payload.avatarUrl !== undefined) {
-    profile.avatarUrl = input.payload.avatarUrl;
-  }
-  if (input.payload.emailCiphertext !== undefined) {
-    profile.emailCiphertext = input.payload.emailCiphertext;
-  }
-  if (input.payload.gender !== undefined) {
-    profile.gender = input.payload.gender;
-  }
-  if (input.payload.nickname !== undefined) {
-    profile.nickname = input.payload.nickname;
-  }
-  if (input.payload.phoneCiphertext !== undefined) {
-    profile.phoneCiphertext = input.payload.phoneCiphertext;
-  }
-  if (input.payload.profileCiphertext !== undefined) {
-    profile.profileCiphertext = input.payload.profileCiphertext;
-  }
+  return replayOrRunMutation(session.user.id, input.clientMutationId, () => {
+    const profile = session.profile;
+    const timestamp = nowIso();
 
-  profile.updatedAt = timestamp;
-  session.user.updatedAt = timestamp;
+    if (input.payload.avatarUrl !== undefined) {
+      profile.avatarUrl = input.payload.avatarUrl;
+    }
+    if (input.payload.emailCiphertext !== undefined) {
+      profile.emailCiphertext = input.payload.emailCiphertext;
+    }
+    if (input.payload.gender !== undefined) {
+      profile.gender = input.payload.gender;
+    }
+    if (input.payload.nickname !== undefined) {
+      profile.nickname = input.payload.nickname;
+    }
+    if (input.payload.phoneCiphertext !== undefined) {
+      profile.phoneCiphertext = input.payload.phoneCiphertext;
+    }
+    if (input.payload.profileCiphertext !== undefined) {
+      profile.profileCiphertext = input.payload.profileCiphertext;
+    }
 
-  return {
-    profile: toPublicUserProfile(session.user, profile),
-  };
+    profile.updatedAt = timestamp;
+    session.user.updatedAt = timestamp;
+    appendSyncChange({
+      clientMutationId: input.clientMutationId,
+      entityId: session.user.id,
+      entityType: "user_profile",
+      operation: "update",
+      userId: session.user.id,
+    });
+
+    return {
+      profile: toPublicUserProfile(session.user, profile),
+    };
+  });
 }
 
 /**
@@ -84,22 +97,32 @@ export function listCurrentUserDevices(currentSession: CurrentSession) {
  */
 export function revokeUserDevice(currentSession: CurrentSession, input: RevokeDeviceInput) {
   const session = requireActiveSession(currentSession);
-  const device = memoryStore.devices.get(input.payload.deviceId);
 
-  if (!device || device.userId !== session.user.id) {
-    throw new AppError({
-      code: ERROR_CODES.DEVICE_NOT_FOUND,
-      message: "设备不存在或不属于当前用户",
-      statusCode: 404,
+  return replayOrRunMutation(session.user.id, input.clientMutationId, () => {
+    const device = memoryStore.devices.get(input.payload.deviceId);
+
+    if (!device || device.userId !== session.user.id) {
+      throw new AppError({
+        code: ERROR_CODES.DEVICE_NOT_FOUND,
+        message: "设备不存在或不属于当前用户",
+        statusCode: 404,
+      });
+    }
+
+    device.revokedAt = nowIso();
+    device.refreshTokenHash = null;
+    appendAuditLog({
+      action: "user_device.revoke",
+      deviceId: session.device.id,
+      resourceId: device.id,
+      resourceType: "user_device",
+      userId: session.user.id,
     });
-  }
 
-  device.revokedAt = nowIso();
-  device.refreshTokenHash = null;
-
-  return {
-    device: toPublicDevice(device),
-  };
+    return {
+      device: toPublicDevice(device),
+    };
+  });
 }
 
 /**
