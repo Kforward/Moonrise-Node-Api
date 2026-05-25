@@ -2,17 +2,18 @@ import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODES } from "../../common/errors/error-codes";
 import type { CurrentSession } from "../../common/types/current-session";
 import { nowIso } from "../../common/utils/date-time";
-import { memoryStore, type UserDeviceRecord } from "../../infrastructure/database/memory-store";
 import { appendAuditLog } from "../audit/audit.service";
 import { requireActiveSession, toPublicDevice, toPublicUserProfile } from "../auth/auth.service";
-import { replayOrRunMutation, replayOrRunMutationAsync } from "../sync/idempotency.service";
-import { appendSyncChange } from "../sync/sync-log.service";
+import { replayOrRunMutationAsync } from "../sync/idempotency.service";
+import { appendSyncChangeAsync } from "../sync/sync-log.service";
 import type { RevokeDeviceInput, UpdateUserProfileInput } from "./users.dto";
+import { getUsersRepository, type UpdateUserProfileData } from "./users.repository";
 
 /**
  * 获取当前用户资料。
  *
  * @param currentSession 当前用户与设备会话。
+ * @returns 当前用户的公开资料响应。
  */
 export async function getCurrentUserProfile(currentSession: CurrentSession) {
   const session = await requireActiveSession(currentSession);
@@ -29,36 +30,25 @@ export async function getCurrentUserProfile(currentSession: CurrentSession) {
  *
  * @param currentSession 当前用户与设备会话。
  * @param input 更新资料 DTO。
+ * @returns 更新后的公开用户资料响应。
  */
 export async function updateCurrentUserProfile(currentSession: CurrentSession, input: UpdateUserProfileInput) {
   const session = await requireActiveSession(currentSession);
+  const usersRepository = getUsersRepository();
 
-  return replayOrRunMutation(session.user.id, input.clientMutationId, () => {
-    const profile = session.profile;
+  return replayOrRunMutationAsync(session.user.id, input.clientMutationId, async () => {
     const timestamp = nowIso();
+    const updateData = buildProfileUpdateData(input, timestamp);
+    const updatedBundle = await usersRepository.updateProfile(session.user.id, updateData);
 
-    if (input.payload.avatarUrl !== undefined) {
-      profile.avatarUrl = input.payload.avatarUrl;
+    if (!updatedBundle) {
+      throw new AppError({
+        code: ERROR_CODES.USER_NOT_FOUND,
+        message: "用户资料不存在或已停用",
+        statusCode: 404,
+      });
     }
-    if (input.payload.emailCiphertext !== undefined) {
-      profile.emailCiphertext = input.payload.emailCiphertext;
-    }
-    if (input.payload.gender !== undefined) {
-      profile.gender = input.payload.gender;
-    }
-    if (input.payload.nickname !== undefined) {
-      profile.nickname = input.payload.nickname;
-    }
-    if (input.payload.phoneCiphertext !== undefined) {
-      profile.phoneCiphertext = input.payload.phoneCiphertext;
-    }
-    if (input.payload.profileCiphertext !== undefined) {
-      profile.profileCiphertext = input.payload.profileCiphertext;
-    }
-
-    profile.updatedAt = timestamp;
-    session.user.updatedAt = timestamp;
-    appendSyncChange({
+    await appendSyncChangeAsync({
       clientMutationId: input.clientMutationId,
       entityId: session.user.id,
       entityType: "user_profile",
@@ -67,7 +57,7 @@ export async function updateCurrentUserProfile(currentSession: CurrentSession, i
     });
 
     return {
-      profile: toPublicUserProfile(session.user, profile),
+      profile: toPublicUserProfile(updatedBundle.user, updatedBundle.profile),
     };
   });
 }
@@ -76,16 +66,14 @@ export async function updateCurrentUserProfile(currentSession: CurrentSession, i
  * 列出当前用户绑定设备。
  *
  * @param currentSession 当前用户与设备会话。
+ * @returns 当前用户绑定设备列表响应。
  */
 export async function listCurrentUserDevices(currentSession: CurrentSession) {
   const session = await requireActiveSession(currentSession);
-  const devices = [...memoryStore.devices.values()]
-    .filter(device => device.userId === session.user.id)
-    .sort(sortDevicesByCreatedAtDesc)
-    .map(toPublicDevice);
+  const devices = await getUsersRepository().listDevices(session.user.id);
 
   return {
-    items: devices,
+    items: devices.map(toPublicDevice),
   };
 }
 
@@ -94,14 +82,16 @@ export async function listCurrentUserDevices(currentSession: CurrentSession) {
  *
  * @param currentSession 当前用户与设备会话。
  * @param input 注销设备 DTO。
+ * @returns 被注销设备的公开信息响应。
  */
 export async function revokeUserDevice(currentSession: CurrentSession, input: RevokeDeviceInput) {
   const session = await requireActiveSession(currentSession);
+  const usersRepository = getUsersRepository();
 
   return replayOrRunMutationAsync(session.user.id, input.clientMutationId, async () => {
-    const device = memoryStore.devices.get(input.payload.deviceId);
+    const device = await usersRepository.revokeDevice(session.user.id, input.payload.deviceId, nowIso());
 
-    if (!device || device.userId !== session.user.id) {
+    if (!device) {
       throw new AppError({
         code: ERROR_CODES.DEVICE_NOT_FOUND,
         message: "设备不存在或不属于当前用户",
@@ -109,8 +99,6 @@ export async function revokeUserDevice(currentSession: CurrentSession, input: Re
       });
     }
 
-    device.revokedAt = nowIso();
-    device.refreshTokenHash = null;
     await appendAuditLog({
       action: "user_device.revoke",
       deviceId: session.device.id,
@@ -126,11 +114,38 @@ export async function revokeUserDevice(currentSession: CurrentSession, input: Re
 }
 
 /**
- * 按创建时间倒序排列设备。
+ * 构造用户资料更新数据。
  *
- * @param left 左侧设备记录。
- * @param right 右侧设备记录。
+ * 该函数只接收 DTO 中允许更新的密文字段和公开展示字段，避免 service 层把额外
+ * 请求字段透传到仓储。
+ *
+ * @param input 更新资料 DTO。
+ * @param updatedAt 服务端更新时间。
+ * @returns 仓储可写入的资料更新数据。
  */
-function sortDevicesByCreatedAtDesc(left: UserDeviceRecord, right: UserDeviceRecord): number {
-  return right.createdAt.localeCompare(left.createdAt);
+function buildProfileUpdateData(input: UpdateUserProfileInput, updatedAt: string): UpdateUserProfileData {
+  const updateData: UpdateUserProfileData = {
+    updatedAt,
+  };
+
+  if (input.payload.avatarUrl !== undefined) {
+    updateData.avatarUrl = input.payload.avatarUrl;
+  }
+  if (input.payload.emailCiphertext !== undefined) {
+    updateData.emailCiphertext = input.payload.emailCiphertext;
+  }
+  if (input.payload.gender !== undefined) {
+    updateData.gender = input.payload.gender;
+  }
+  if (input.payload.nickname !== undefined) {
+    updateData.nickname = input.payload.nickname;
+  }
+  if (input.payload.phoneCiphertext !== undefined) {
+    updateData.phoneCiphertext = input.payload.phoneCiphertext;
+  }
+  if (input.payload.profileCiphertext !== undefined) {
+    updateData.profileCiphertext = input.payload.profileCiphertext;
+  }
+
+  return updateData;
 }
