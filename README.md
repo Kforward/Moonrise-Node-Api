@@ -1408,6 +1408,15 @@ GET http://localhost:8000/api/v1/health
 
 当前 `src/` 目录按照 `common / infrastructure / modules / database` 分层组织；旧 Koa、MySQL、Sequelize、商品上传、账号密码 demo 和 WebSocket demo 已从运行骨架中移除。`auth / users / cycle` 已具备开发期基础接口、DTO 校验和内存仓储适配器，`sync_change_logs` 和审计日志也已接入内存适配器。后续业务实现请优先阅读 `backend_ai_docs/07_migration_roadmap.md`。
 
+## 测试
+
+当前测试使用 Node.js 内置 test runner，并通过 `tsx` 直接运行 TypeScript 测试文件。首批集成测试覆盖微信 mock 登录、refresh token 轮换、资料更新幂等、经期记录重叠校验和同步日志。
+
+```bash
+npm test
+npm run test:integration
+```
+
 ## 数据库迁移
 
 当前默认使用 `DATABASE_DRIVER=memory`，便于前端本地联调不依赖 PostgreSQL。PostgreSQL/Drizzle 基础设施、schema 和迁移文件已接入，`auth / users / cycle / sync` 已具备内存/PostgreSQL 双仓储实现，认证审计日志、用户资料同步日志、周期同步日志、增量同步读取和幂等响应快照可在 PostgreSQL 模式写入或读取对应数据表。

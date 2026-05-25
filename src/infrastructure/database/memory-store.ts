@@ -159,6 +159,26 @@ export const memoryStore: MemoryStore = {
 };
 
 /**
+ * 重置开发期内存仓储。
+ *
+ * 该函数主要服务集成测试，确保每个测试用例都从干净的数据状态启动，避免用户、设备、
+ * 幂等快照和同步日志在用例之间相互污染。运行中的业务代码不应在请求处理中调用它。
+ */
+export function resetMemoryStore(): void {
+  memoryStore.auditLogs.length = 0;
+  memoryStore.authIdentities.clear();
+  memoryStore.cycleSettings.clear();
+  memoryStore.devices.clear();
+  memoryStore.mutations.clear();
+  memoryStore.nextAuditLogId = 1;
+  memoryStore.nextSyncChangeId = 1;
+  memoryStore.periodRecords.clear();
+  memoryStore.profiles.clear();
+  memoryStore.syncChangeLogs.length = 0;
+  memoryStore.users.clear();
+}
+
+/**
  * 创建新用户以及默认资料和周期设置。
  *
  * 该函数是开发期内存仓储的聚合创建入口，后续替换 PostgreSQL 时应落到事务中。

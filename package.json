@@ -18,7 +18,8 @@
     "lint": "eslint --ext .ts src",
     "lint-staged": "lint-staged",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck"
+    "test": "npm run typecheck && npm run test:integration",
+    "test:integration": "tsx --test test/integration/auth-cycle-sync.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
