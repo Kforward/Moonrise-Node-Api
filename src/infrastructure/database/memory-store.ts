@@ -79,6 +79,21 @@ export interface MutationRecord {
   createdAt: string;
 }
 
+export interface BackupSnapshotRecord {
+  id: string;
+  userId: string;
+  clientBackupId: string;
+  encrypted: boolean;
+  algorithm: "none" | "aes-256-gcm" | "xchacha20-poly1305";
+  keyVersion: number;
+  sizeBytes: number;
+  snapshotCiphertext: string;
+  snapshotHash: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
 /**
  * 可参与前端增量同步的实体类型。
  *
@@ -133,6 +148,7 @@ export interface AuditLogRecord {
 export interface MemoryStore {
   auditLogs: AuditLogRecord[];
   authIdentities: Map<string, AuthIdentityRecord>;
+  backupSnapshots: Map<string, BackupSnapshotRecord>;
   cycleSettings: Map<string, CycleSettingsRecord>;
   devices: Map<string, UserDeviceRecord>;
   mutations: Map<string, MutationRecord>;
@@ -147,6 +163,7 @@ export interface MemoryStore {
 export const memoryStore: MemoryStore = {
   auditLogs: [],
   authIdentities: new Map(),
+  backupSnapshots: new Map(),
   cycleSettings: new Map(),
   devices: new Map(),
   mutations: new Map(),
@@ -167,6 +184,7 @@ export const memoryStore: MemoryStore = {
 export function resetMemoryStore(): void {
   memoryStore.auditLogs.length = 0;
   memoryStore.authIdentities.clear();
+  memoryStore.backupSnapshots.clear();
   memoryStore.cycleSettings.clear();
   memoryStore.devices.clear();
   memoryStore.mutations.clear();

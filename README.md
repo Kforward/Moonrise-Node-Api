@@ -1410,8 +1410,9 @@ GET http://localhost:8000/api/v1/health
 
 ## 测试
 
-当前测试使用 Node.js 内置 test runner，并通过 `tsx` 直接运行 TypeScript 测试文件。首批集成测试覆盖微信 mock 登录、refresh token 轮换、资料更新幂等、经期记录重叠校验和同步日志。
+当前测试使用 Node.js 内置 test runner，并通过 `tsx` 直接运行 TypeScript 测试文件。首批集成测试覆盖微信 mock 登录、refresh token 轮换、资料更新幂等、经期记录重叠校验、同步日志和备份快照流程。
 目前同步测试也覆盖了 `/sync/push` 批量离线变更处理，包括成功批量提交、单条冲突失败继续处理后续变更，以及重复 `clientMutationId` 返回首次结果。
+备份测试覆盖快照创建、列表、详情、恢复审计、软删除、重复 `clientMutationId` 幂等和最近 5 条有效快照保留策略。
 
 ```bash
 npm test

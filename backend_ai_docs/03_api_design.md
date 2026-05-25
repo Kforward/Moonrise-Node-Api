@@ -120,6 +120,25 @@
 | `POST` | `/api/v1/backups/restore` | 标记并审计一次恢复 |
 | `POST` | `/api/v1/backups/delete` | 删除快照 |
 
+创建备份快照请求示例：
+
+```json
+{
+  "clientMutationId": "uuid-from-client",
+  "payload": {
+    "clientBackupId": "local-backup-id",
+    "encrypted": true,
+    "algorithm": "aes-256-gcm",
+    "keyVersion": 1,
+    "sizeBytes": 1024,
+    "snapshotCiphertext": "encrypted-payload",
+    "snapshotHash": "sha256-or-client-hash"
+  }
+}
+```
+
+列表接口只返回元数据，详情接口才返回 `snapshotCiphertext`。服务端第一阶段保留最近 5 条有效快照；创建、恢复、删除都会写入审计日志和同步日志。
+
 ## 8. 隐私安全接口
 
 | 方法 | 路径 | 说明 |

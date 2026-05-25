@@ -67,6 +67,45 @@ interface SyncStateData {
   latestVersion: number;
 }
 
+interface BackupSnapshotSummary {
+  id: string;
+  clientBackupId: string;
+  encrypted: boolean;
+  algorithm: string;
+  keyVersion: number;
+  sizeBytes: number;
+  snapshotHash: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface BackupSnapshotDetail extends BackupSnapshotSummary {
+  snapshotCiphertext: string;
+}
+
+interface BackupSnapshotData {
+  snapshot: BackupSnapshotSummary;
+}
+
+interface BackupSnapshotDetailData {
+  snapshot: BackupSnapshotDetail;
+}
+
+interface BackupSnapshotsPageData {
+  items: BackupSnapshotSummary[];
+  nextCursor: string | null;
+}
+
+interface BackupRestoreData {
+  restoredAt: string;
+  snapshot: BackupSnapshotSummary;
+}
+
+interface BackupDeleteData {
+  deletedAt: string;
+  snapshotId: string;
+}
+
 interface SyncPushResultItem {
   clientMutationId: string;
   entityType: string;
@@ -523,6 +562,169 @@ test("sync/push 单条失败不会阻断后续变更且重复项返回首次结�
     ["push-period-idempotent", "push-profile-after-failed-item"],
   );
 });
+
+test("备份快照支持创建、详情、恢复审计和软删除", async context => {
+  const app = await createMemoryTestApp(context);
+  const login = await loginWithMockWechat(app, "test-backup-flow");
+  const createResponse = await createBackupSnapshotViaApi(app, login.accessToken, {
+    clientBackupId: "backup-client-001",
+    clientMutationId: "backup-create-001",
+    snapshotCiphertext: "ciphertext-001",
+    snapshotHash: "hash-001",
+  });
+  const createBody = parseApiResponse<BackupSnapshotData>(createResponse);
+  const duplicateResponse = await createBackupSnapshotViaApi(app, login.accessToken, {
+    clientBackupId: "backup-client-duplicate-payload",
+    clientMutationId: "backup-create-001",
+    snapshotCiphertext: "ciphertext-duplicate",
+    snapshotHash: "hash-duplicate",
+  });
+  const duplicateBody = parseApiResponse<BackupSnapshotData>(duplicateResponse);
+
+  assert.equal(createResponse.statusCode, 200);
+  assert.equal(duplicateResponse.statusCode, 200);
+  assert.equal(duplicateBody.data.snapshot.id, createBody.data.snapshot.id);
+  assert.equal(duplicateBody.data.snapshot.clientBackupId, "backup-client-001");
+
+  const listResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/backups?limit=5",
+  });
+  const listBody = parseApiResponse<BackupSnapshotsPageData>(listResponse);
+
+  assert.equal(listResponse.statusCode, 200);
+  assert.equal(listBody.data.items.length, 1);
+  assert.equal(listBody.data.items[0]?.snapshotHash, "hash-001");
+
+  const detailResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: `/api/v1/backups/detail?id=${createBody.data.snapshot.id}`,
+  });
+  const detailBody = parseApiResponse<BackupSnapshotDetailData>(detailResponse);
+
+  assert.equal(detailResponse.statusCode, 200);
+  assert.equal(detailBody.data.snapshot.snapshotCiphertext, "ciphertext-001");
+
+  const restoreResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/backups/restore",
+    ...authJsonRequest(login.accessToken, {
+      clientMutationId: "backup-restore-001",
+      payload: {
+        id: createBody.data.snapshot.id,
+      },
+    }),
+  });
+  const restoreBody = parseApiResponse<BackupRestoreData>(restoreResponse);
+
+  assert.equal(restoreResponse.statusCode, 200);
+  assert.equal(restoreBody.data.snapshot.id, createBody.data.snapshot.id);
+  assert.equal(typeof restoreBody.data.restoredAt, "string");
+
+  const deleteResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/backups/delete",
+    ...authJsonRequest(login.accessToken, {
+      clientMutationId: "backup-delete-001",
+      payload: {
+        id: createBody.data.snapshot.id,
+      },
+    }),
+  });
+  const deleteBody = parseApiResponse<BackupDeleteData>(deleteResponse);
+
+  assert.equal(deleteResponse.statusCode, 200);
+  assert.equal(deleteBody.data.snapshotId, createBody.data.snapshot.id);
+
+  const deletedDetailResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: `/api/v1/backups/detail?id=${createBody.data.snapshot.id}`,
+  });
+  const deletedDetailBody = parseApiResponse<null>(deletedDetailResponse);
+
+  assert.equal(deletedDetailResponse.statusCode, 404);
+  assert.equal(deletedDetailBody.code, "BACKUP_SNAPSHOT_NOT_FOUND");
+
+  const changesResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/sync/changes?afterVersion=0&limit=20",
+  });
+  const changesBody = parseApiResponse<SyncChangesData>(changesResponse);
+  const backupChanges = changesBody.data.items.filter(item => item.entityType === "backup_snapshot");
+
+  assert.deepEqual(
+    backupChanges.map(change => change.operation),
+    ["create", "restore", "delete"],
+  );
+});
+
+test("备份快照只保留最近 5 条有效记录", async context => {
+  const app = await createMemoryTestApp(context);
+  const login = await loginWithMockWechat(app, "test-backup-retention");
+
+  for (let index = 1; index <= 6; index += 1) {
+    const response = await createBackupSnapshotViaApi(app, login.accessToken, {
+      clientBackupId: `backup-retention-${index}`,
+      clientMutationId: `backup-retention-create-${index}`,
+      snapshotCiphertext: `ciphertext-${index}`,
+      snapshotHash: `hash-${index}`,
+    });
+
+    assert.equal(response.statusCode, 200);
+  }
+
+  const listResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/backups?limit=10",
+  });
+  const listBody = parseApiResponse<BackupSnapshotsPageData>(listResponse);
+
+  assert.equal(listResponse.statusCode, 200);
+  assert.equal(listBody.data.items.length, 5);
+  assert.equal(listBody.data.items.some(item => item.clientBackupId === "backup-retention-1"), false);
+  assert.equal(listBody.data.items[0]?.clientBackupId, "backup-retention-6");
+});
+
+/**
+ * 通过 HTTP 创建备份快照。
+ *
+ * @param app Fastify 测试应用。
+ * @param accessToken 后端签发的 access token。
+ * @param input 快照测试输入。
+ * @returns Fastify inject 响应。
+ */
+function createBackupSnapshotViaApi(
+  app: FastifyInstance,
+  accessToken: string,
+  input: {
+    clientBackupId: string;
+    clientMutationId: string;
+    snapshotCiphertext: string;
+    snapshotHash: string;
+  },
+) {
+  return app.inject({
+    method: "POST",
+    url: "/api/v1/backups/create",
+    ...authJsonRequest(accessToken, {
+      clientMutationId: input.clientMutationId,
+      payload: {
+        algorithm: "aes-256-gcm",
+        clientBackupId: input.clientBackupId,
+        encrypted: true,
+        keyVersion: 1,
+        sizeBytes: input.snapshotCiphertext.length,
+        snapshotCiphertext: input.snapshotCiphertext,
+        snapshotHash: input.snapshotHash,
+      },
+    }),
+  });
+}
 
 /**
  * 从 sync/push 单条成功结果中读取经期记录。
