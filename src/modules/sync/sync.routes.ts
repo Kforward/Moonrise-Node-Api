@@ -1,16 +1,15 @@
 import type { FastifyInstance } from "fastify";
-import { createNotImplementedHandler } from "../../common/handlers/not-implemented-handler";
 import { requireCurrentSession } from "../../common/middlewares/auth-context";
 import { buildSuccessResponse } from "../../common/responses/api-response";
 import { validateWithZod } from "../../common/validators/validate-with-zod";
 import { appEnv } from "../../infrastructure/config/env";
-import { listSyncChangesQuerySchema } from "./sync.dto";
-import { getSyncState, listSyncChanges } from "./sync-log.service";
+import { listSyncChangesQuerySchema, syncPushSchema } from "./sync.dto";
+import { getSyncState, listSyncChanges, pushSyncChanges } from "./sync-log.service";
 
 /**
  * 注册同步模块路由。
  *
- * 当前阶段先支持拉取同步日志和读取同步水位，批量离线推送后续再落地。
+ * 当前阶段支持拉取同步日志、读取同步水位和批量提交已支持的离线变更。
  *
  * @param app Fastify 应用实例。
  */
@@ -24,10 +23,12 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     return buildSuccessResponse(request.id, await listSyncChanges(currentSession, query));
   });
 
-  app.post(`${basePath}/push`, createNotImplementedHandler(
-    "sync",
-    "批量处理离线变更并逐条校验 clientMutationId",
-  ));
+  app.post(`${basePath}/push`, async request => {
+    const currentSession = requireCurrentSession(request);
+    const input = validateWithZod(syncPushSchema, request.body);
+
+    return buildSuccessResponse(request.id, await pushSyncChanges(currentSession, input));
+  });
 
   app.get(`${basePath}/state`, async request => {
     const currentSession = requireCurrentSession(request);

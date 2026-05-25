@@ -1,9 +1,28 @@
 import type { CurrentSession } from "../../common/types/current-session";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODES } from "../../common/errors/error-codes";
+import { validateWithZod } from "../../common/validators/validate-with-zod";
 import { nowIso } from "../../common/utils/date-time";
 import { sha256 } from "../../common/utils/hash";
 import type { SyncChangeLogRecord, SyncEntityType, SyncOperation } from "../../infrastructure/database/memory-store";
 import { requireActiveSession } from "../auth/auth.service";
-import type { ListSyncChangesQuery } from "./sync.dto";
+import {
+  createPeriodRecordSchema,
+  deletePeriodRecordSchema,
+  finishPeriodRecordSchema,
+  updateCycleSettingsSchema,
+  updatePeriodRecordSchema,
+} from "../cycle/cycle.dto";
+import {
+  createPeriodRecord,
+  deletePeriodRecord,
+  finishPeriodRecord,
+  updateCycleSettings,
+  updatePeriodRecord,
+} from "../cycle/cycle.service";
+import { updateUserProfileSchema } from "../users/users.dto";
+import { updateCurrentUserProfile } from "../users/users.service";
+import type { ListSyncChangesQuery, SyncPushChangeInput, SyncPushInput } from "./sync.dto";
 import { getSyncRepository } from "./sync.repository";
 
 /**
@@ -25,6 +44,28 @@ export interface AppendSyncChangeInput {
   /** 前端生成的幂等变更 ID，用于排查和后续去重。 */
   clientMutationId?: string | null;
 }
+
+interface SyncPushChangeSuccessResult {
+  clientMutationId: string;
+  entityType: string;
+  operation: string;
+  success: true;
+  data: unknown;
+}
+
+interface SyncPushChangeFailedResult {
+  clientMutationId: string;
+  entityType: string;
+  operation: string;
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    data: unknown;
+  };
+}
+
+type SyncPushChangeResult = SyncPushChangeSuccessResult | SyncPushChangeFailedResult;
 
 /**
  * 写入同步变更日志。
@@ -89,6 +130,164 @@ export async function getSyncState(currentSession: CurrentSession) {
   return {
     latestVersion,
   };
+}
+
+/**
+ * 批量处理前端离线变更。
+ *
+ * 该函数逐条分发到现有业务 service，复用各模块已经实现的 DTO 校验、归属校验、幂等
+ * 快照和同步日志写入。单条变更失败不会阻断后续变更，前端可以根据 `results` 引导用户
+ * 处理冲突或重试失败项。
+ *
+ * @param currentSession 当前用户与设备会话。
+ * @param input 批量离线变更输入。
+ * @returns 每条变更的处理结果和处理后的同步水位。
+ */
+export async function pushSyncChanges(currentSession: CurrentSession, input: SyncPushInput) {
+  const session = await requireActiveSession(currentSession);
+  const results: SyncPushChangeResult[] = [];
+
+  for (const change of input.changes) {
+    results.push(await applySyncPushChange({
+      deviceId: session.device.id,
+      userId: session.user.id,
+    }, change));
+  }
+
+  const latestVersion = await getSyncRepository().getLatestVersion(session.user.id);
+
+  return {
+    failedCount: results.filter(result => !result.success).length,
+    latestVersion,
+    results,
+    successCount: results.filter(result => result.success).length,
+  };
+}
+
+/**
+ * 处理单条离线变更并转为批量结果。
+ *
+ * @param currentSession 当前用户与设备定位信息。
+ * @param change 单条离线变更。
+ * @returns 单条成功或失败结果。
+ */
+async function applySyncPushChange(
+  currentSession: CurrentSession,
+  change: SyncPushChangeInput,
+): Promise<SyncPushChangeResult> {
+  try {
+    return {
+      clientMutationId: change.clientMutationId,
+      data: await dispatchSyncPushChange(currentSession, change),
+      entityType: change.entityType,
+      operation: change.operation,
+      success: true,
+    };
+  } catch (error) {
+    if (!(error instanceof AppError)) {
+      throw error;
+    }
+
+    return {
+      clientMutationId: change.clientMutationId,
+      entityType: change.entityType,
+      error: toSyncPushError(error),
+      operation: change.operation,
+      success: false,
+    };
+  }
+}
+
+/**
+ * 按实体类型和操作类型分发离线变更。
+ *
+ * @param currentSession 当前用户与设备定位信息。
+ * @param change 单条离线变更。
+ * @returns 对应业务 service 的响应数据。
+ */
+async function dispatchSyncPushChange(currentSession: CurrentSession, change: SyncPushChangeInput): Promise<unknown> {
+  if (change.entityType === "user_profile" && change.operation === "update") {
+    return updateCurrentUserProfile(currentSession, validateWithZod(updateUserProfileSchema, buildMutationInput(change)));
+  }
+
+  if (change.entityType === "cycle_settings" && change.operation === "update") {
+    return updateCycleSettings(currentSession, validateWithZod(updateCycleSettingsSchema, buildMutationInput(change)));
+  }
+
+  if (change.entityType === "period_record") {
+    return dispatchPeriodRecordPushChange(currentSession, change);
+  }
+
+  throwUnsupportedSyncPushChange(`暂不支持的离线变更：${change.entityType}.${change.operation}`);
+}
+
+/**
+ * 分发经期记录离线变更。
+ *
+ * @param currentSession 当前用户与设备定位信息。
+ * @param change 单条经期记录离线变更。
+ * @returns 经期记录业务 service 的响应数据。
+ */
+async function dispatchPeriodRecordPushChange(currentSession: CurrentSession, change: SyncPushChangeInput): Promise<unknown> {
+  const mutationInput = buildMutationInput(change);
+
+  if (change.operation === "create") {
+    return createPeriodRecord(currentSession, validateWithZod(createPeriodRecordSchema, mutationInput));
+  }
+
+  if (change.operation === "update") {
+    return updatePeriodRecord(currentSession, validateWithZod(updatePeriodRecordSchema, mutationInput));
+  }
+
+  if (change.operation === "delete") {
+    return deletePeriodRecord(currentSession, validateWithZod(deletePeriodRecordSchema, mutationInput));
+  }
+
+  if (change.operation === "finish") {
+    return finishPeriodRecord(currentSession, validateWithZod(finishPeriodRecordSchema, mutationInput));
+  }
+
+  throwUnsupportedSyncPushChange(`暂不支持的经期记录离线操作：${change.operation}`);
+}
+
+/**
+ * 将批量变更项转换为业务写接口 DTO 形状。
+ *
+ * @param change 单条离线变更。
+ * @returns 业务 service 可接收的 `clientMutationId + payload` 结构。
+ */
+function buildMutationInput(change: SyncPushChangeInput): { clientMutationId: string; payload: unknown } {
+  return {
+    clientMutationId: change.clientMutationId,
+    payload: change.payload,
+  };
+}
+
+/**
+ * 转换单条离线变更错误。
+ *
+ * @param error 捕获到的业务异常或未知异常。
+ * @returns 前端可识别的单条失败信息。
+ */
+function toSyncPushError(error: AppError): SyncPushChangeFailedResult["error"] {
+  return {
+    code: error.code,
+    data: error.data,
+    message: error.message,
+  };
+}
+
+/**
+ * 抛出离线变更暂不支持错误。
+ *
+ * @param message 面向前端和调试日志的错误说明。
+ */
+function throwUnsupportedSyncPushChange(message: string): never {
+  throw new AppError({
+    code: ERROR_CODES.NOT_IMPLEMENTED,
+    message,
+    statusCode: 400,
+  });
 }
 
 /**

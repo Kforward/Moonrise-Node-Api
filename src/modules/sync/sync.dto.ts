@@ -12,6 +12,32 @@ export const listSyncChangesQuerySchema = z.object({
 });
 
 /**
+ * 批量推送离线变更请求体。
+ *
+ * 这里先保留较宽的 `entityType / operation / payload` 形状，让 service 层逐条分发到
+ * 当前已支持的业务 DTO。这样单条离线变更的校验失败可以落在该条结果中，而不是让整批
+ * 请求直接失败。
+ */
+export const syncPushSchema = z.object({
+  changes: z.array(z.object({
+    clientMutationId: z.string().min(1, "clientMutationId 不能为空").max(120),
+    entityType: z.string().min(1, "entityType 不能为空").max(80),
+    operation: z.string().min(1, "operation 不能为空").max(40),
+    payload: z.unknown(),
+  })).min(1, "changes 至少需要一条变更").max(50, "单次最多推送 50 条变更"),
+});
+
+/**
  * 增量同步变更查询 DTO 类型。
  */
 export type ListSyncChangesQuery = z.infer<typeof listSyncChangesQuerySchema>;
+
+/**
+ * 批量推送离线变更 DTO 类型。
+ */
+export type SyncPushInput = z.infer<typeof syncPushSchema>;
+
+/**
+ * 单条离线变更 DTO 类型。
+ */
+export type SyncPushChangeInput = SyncPushInput["changes"][number];

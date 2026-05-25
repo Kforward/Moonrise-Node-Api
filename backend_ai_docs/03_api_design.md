@@ -86,6 +86,30 @@
 | `POST` | `/api/v1/sync/push` | 批量推送离线变更 |
 | `GET` | `/api/v1/sync/state` | 获取服务器同步水位 |
 
+`/sync/push` 当前支持批量提交已落地的 `user_profile.update`、`cycle_settings.update` 和 `period_record.create/update/delete/finish`。请求示例：
+
+```json
+{
+  "changes": [
+    {
+      "clientMutationId": "uuid-from-client",
+      "entityType": "period_record",
+      "operation": "create",
+      "payload": {
+        "clientRecordId": "local-id",
+        "startDate": "2026-07-01",
+        "endDate": "2026-07-04",
+        "intensity": 2,
+        "painLevel": 1,
+        "moods": []
+      }
+    }
+  ]
+}
+```
+
+服务端会逐条复用业务接口校验、幂等和同步日志写入；单条失败不会阻断后续变更，响应中的 `results` 会标记每条是否成功，并返回最新同步水位。
+
 ## 7. 备份接口
 
 | 方法 | 路径 | 说明 |

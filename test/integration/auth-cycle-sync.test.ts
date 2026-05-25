@@ -67,6 +67,26 @@ interface SyncStateData {
   latestVersion: number;
 }
 
+interface SyncPushResultItem {
+  clientMutationId: string;
+  entityType: string;
+  operation: string;
+  success: boolean;
+  data?: unknown;
+  error?: {
+    code: string;
+    message: string;
+    data: unknown;
+  };
+}
+
+interface SyncPushData {
+  failedCount: number;
+  latestVersion: number;
+  results: SyncPushResultItem[];
+  successCount: number;
+}
+
 /**
  * 创建内存模式测试应用。
  *
@@ -343,3 +363,178 @@ test("经期记录幂等写入、重叠校验和同步水位保持一致", async
   assert.equal(stateResponse.statusCode, 200);
   assert.equal(stateBody.data.latestVersion, syncBody.data.nextVersion);
 });
+
+test("sync/push 可以批量应用当前支持的离线变更", async context => {
+  const app = await createMemoryTestApp(context);
+  const login = await loginWithMockWechat(app, "test-sync-push-success");
+  const pushResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/sync/push",
+    ...authJsonRequest(login.accessToken, {
+      changes: [
+        {
+          clientMutationId: "push-profile-update",
+          entityType: "user_profile",
+          operation: "update",
+          payload: {
+            nickname: "批量同步昵称",
+          },
+        },
+        {
+          clientMutationId: "push-cycle-settings-update",
+          entityType: "cycle_settings",
+          operation: "update",
+          payload: {
+            avgCycleLength: 30,
+            avgPeriodLength: 6,
+            reminderDaysAhead: 2,
+            reminderEnabled: true,
+            reminderTime: "08:30",
+          },
+        },
+        {
+          clientMutationId: "push-period-create",
+          entityType: "period_record",
+          operation: "create",
+          payload: {
+            clientRecordId: "push-period-001",
+            endDate: "2026-07-04",
+            intensity: 2,
+            moods: ["steady"],
+            painLevel: 1,
+            startDate: "2026-07-01",
+          },
+        },
+      ],
+    }),
+  });
+  const pushBody = parseApiResponse<SyncPushData>(pushResponse);
+
+  assert.equal(pushResponse.statusCode, 200);
+  assert.equal(pushBody.data.successCount, 3);
+  assert.equal(pushBody.data.failedCount, 0);
+  assert.equal(pushBody.data.results.every(result => result.success), true);
+
+  const changesResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/sync/changes?afterVersion=0&limit=20",
+  });
+  const changesBody = parseApiResponse<SyncChangesData>(changesResponse);
+
+  assert.equal(changesResponse.statusCode, 200);
+  assert.deepEqual(
+    changesBody.data.items.map(item => item.clientMutationId),
+    ["push-profile-update", "push-cycle-settings-update", "push-period-create"],
+  );
+  assert.equal(pushBody.data.latestVersion, changesBody.data.nextVersion);
+});
+
+test("sync/push 单条失败不会阻断后续变更且重复项返回首次结果", async context => {
+  const app = await createMemoryTestApp(context);
+  const login = await loginWithMockWechat(app, "test-sync-push-partial");
+  const firstPushResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/sync/push",
+    ...authJsonRequest(login.accessToken, {
+      changes: [
+        {
+          clientMutationId: "push-period-idempotent",
+          entityType: "period_record",
+          operation: "create",
+          payload: {
+            clientRecordId: "push-period-original",
+            endDate: "2026-08-05",
+            intensity: 2,
+            moods: ["ok"],
+            painLevel: 1,
+            startDate: "2026-08-01",
+          },
+        },
+      ],
+    }),
+  });
+  const firstPushBody = parseApiResponse<SyncPushData>(firstPushResponse);
+  const originalRecord = readPeriodRecordFromPushResult(firstPushBody.data.results[0]);
+  const secondPushResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/sync/push",
+    ...authJsonRequest(login.accessToken, {
+      changes: [
+        {
+          clientMutationId: "push-period-idempotent",
+          entityType: "period_record",
+          operation: "create",
+          payload: {
+            clientRecordId: "push-period-duplicate",
+            endDate: "2026-09-05",
+            intensity: 3,
+            moods: ["duplicate"],
+            painLevel: 2,
+            startDate: "2026-09-01",
+          },
+        },
+        {
+          clientMutationId: "push-period-overlap",
+          entityType: "period_record",
+          operation: "create",
+          payload: {
+            clientRecordId: "push-period-overlap",
+            endDate: "2026-08-06",
+            intensity: 1,
+            moods: [],
+            painLevel: 0,
+            startDate: "2026-08-03",
+          },
+        },
+        {
+          clientMutationId: "push-profile-after-failed-item",
+          entityType: "user_profile",
+          operation: "update",
+          payload: {
+            nickname: "失败后仍处理",
+          },
+        },
+      ],
+    }),
+  });
+  const secondPushBody = parseApiResponse<SyncPushData>(secondPushResponse);
+  const duplicateRecord = readPeriodRecordFromPushResult(secondPushBody.data.results[0]);
+
+  assert.equal(firstPushResponse.statusCode, 200);
+  assert.equal(secondPushResponse.statusCode, 200);
+  assert.equal(secondPushBody.data.successCount, 2);
+  assert.equal(secondPushBody.data.failedCount, 1);
+  assert.equal(duplicateRecord.id, originalRecord.id);
+  assert.equal(duplicateRecord.clientRecordId, "push-period-original");
+  assert.equal(secondPushBody.data.results[1]?.success, false);
+  assert.equal(secondPushBody.data.results[1]?.error?.code, "CYCLE_RECORD_OVERLAPPED");
+  assert.equal(secondPushBody.data.results[2]?.success, true);
+
+  const changesResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/sync/changes?afterVersion=0&limit=20",
+  });
+  const changesBody = parseApiResponse<SyncChangesData>(changesResponse);
+
+  assert.deepEqual(
+    changesBody.data.items.map(item => item.clientMutationId),
+    ["push-period-idempotent", "push-profile-after-failed-item"],
+  );
+});
+
+/**
+ * 从 sync/push 单条成功结果中读取经期记录。
+ *
+ * @param result 单条批量推送结果。
+ * @returns 经期记录精简信息。
+ */
+function readPeriodRecordFromPushResult(result: SyncPushResultItem | undefined): PeriodRecordData["record"] {
+  assert.ok(result);
+  assert.equal(result.success, true);
+
+  const data = result.data as PeriodRecordData;
+
+  return data.record;
+}

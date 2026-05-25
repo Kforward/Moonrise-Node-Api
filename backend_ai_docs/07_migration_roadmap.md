@@ -41,7 +41,8 @@
 11. 已完成：新增 `idempotency_records` 幂等响应快照表和 PostgreSQL 仓储实现，PostgreSQL 模式不再依赖进程内快照。
 12. 已完成：接入微信 `jscode2session` 登录适配器，生产环境可用真实微信 openid 绑定账号，开发环境保留显式 mock 模式。
 13. 已完成：建立 Node.js 内置 test runner + `tsx` 测试入口，首批覆盖登录、refresh token、幂等写入、经期重叠校验和同步日志。
-14. 下一步：继续扩展 PostgreSQL 仓储、备份、隐私和安全失败路径测试。
+14. 已完成：实现 `/sync/push` 批量离线变更处理，支持当前已落地的用户资料、周期设置和经期记录写操作，并逐条返回成功/失败结果。
+15. 下一步：继续扩展 PostgreSQL 仓储、备份、隐私和安全失败路径测试。
 
 ### 5.2 第二阶段
 
@@ -70,5 +71,5 @@
 ## 7. 当前最高优先级
 
 - 继续扩展 PostgreSQL 仓储、备份、隐私和安全失败路径测试。
-- 继续落地 `sync/push`、`backup`、`privacy` 的真实业务实现。
+- 继续落地 `backup`、`privacy` 的真实业务实现。
 - 任何新增代码都要遵守中文注释与 JSDoc 规则。
