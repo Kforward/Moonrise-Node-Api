@@ -106,6 +106,39 @@ interface BackupDeleteData {
   snapshotId: string;
 }
 
+interface PrivacyConfigData {
+  config: {
+    userId: string;
+    storageMode: string;
+    cipherAlgorithm: string;
+    keyVersion: number;
+    e2eeEnabled: boolean;
+    recoveryEnabled: boolean;
+  };
+}
+
+interface VaultItemSummary {
+  id: string;
+  entityType: string;
+  entityId: string;
+  algorithm: string;
+  keyVersion: number;
+  nonce: string;
+  aad: string | null;
+  ciphertext: string;
+  contentHash: string;
+}
+
+interface VaultItemData {
+  item: VaultItemSummary;
+  operation: string;
+}
+
+interface VaultItemsPageData {
+  items: VaultItemSummary[];
+  nextCursor: string | null;
+}
+
 interface SyncPushResultItem {
   clientMutationId: string;
   entityType: string;
@@ -563,6 +596,164 @@ test("sync/push 单条失败不会阻断后续变更且重复项返回首次结�
   );
 });
 
+test("隐私配置支持读取、切换、幂等、同步日志和审计", async context => {
+  const app = await createMemoryTestApp(context);
+  const login = await loginWithMockWechat(app, "test-privacy-config");
+  const defaultConfigResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/privacy/config",
+  });
+  const defaultConfigBody = parseApiResponse<PrivacyConfigData>(defaultConfigResponse);
+
+  assert.equal(defaultConfigResponse.statusCode, 200);
+  assert.equal(defaultConfigBody.data.config.storageMode, "plain");
+  assert.equal(defaultConfigBody.data.config.cipherAlgorithm, "none");
+  assert.equal(defaultConfigBody.data.config.keyVersion, 1);
+
+  const firstUpdateResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/privacy/config/update",
+    ...authJsonRequest(login.accessToken, {
+      clientMutationId: "privacy-config-update-idempotent",
+      payload: {
+        cipherAlgorithm: "aes-256-gcm",
+        e2eeEnabled: true,
+        keyVersion: 2,
+        recoveryEnabled: true,
+        storageMode: "e2ee",
+      },
+    }),
+  });
+  const duplicateUpdateResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/privacy/config/update",
+    ...authJsonRequest(login.accessToken, {
+      clientMutationId: "privacy-config-update-idempotent",
+      payload: {
+        cipherAlgorithm: "none",
+        e2eeEnabled: false,
+        keyVersion: 1,
+        recoveryEnabled: false,
+        storageMode: "plain",
+      },
+    }),
+  });
+  const firstUpdateBody = parseApiResponse<PrivacyConfigData>(firstUpdateResponse);
+  const duplicateUpdateBody = parseApiResponse<PrivacyConfigData>(duplicateUpdateResponse);
+
+  assert.equal(firstUpdateResponse.statusCode, 200);
+  assert.equal(duplicateUpdateResponse.statusCode, 200);
+  assert.equal(firstUpdateBody.data.config.storageMode, "e2ee");
+  assert.equal(firstUpdateBody.data.config.keyVersion, 2);
+  assert.equal(duplicateUpdateBody.data.config.storageMode, "e2ee");
+  assert.equal(duplicateUpdateBody.data.config.keyVersion, 2);
+
+  const syncResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/sync/changes?afterVersion=0&limit=20",
+  });
+  const syncBody = parseApiResponse<SyncChangesData>(syncResponse);
+  const privacyChanges = syncBody.data.items.filter(item => item.entityType === "privacy_config");
+
+  assert.equal(syncResponse.statusCode, 200);
+  assert.equal(privacyChanges.length, 1);
+  assert.equal(privacyChanges[0]?.operation, "update");
+  assert.equal(privacyChanges[0]?.clientMutationId, "privacy-config-update-idempotent");
+
+  const { memoryStore } = await import("../../src/infrastructure/database/memory-store");
+  const privacyAuditLogs = memoryStore.auditLogs.filter(log => log.action === "privacy_config.update");
+
+  assert.equal(privacyAuditLogs.length, 1);
+  assert.equal(privacyAuditLogs[0]?.metadata.previousStorageMode, "plain");
+  assert.equal(privacyAuditLogs[0]?.metadata.storageMode, "e2ee");
+});
+
+test("vault item 支持密文托管 upsert、幂等和同步日志", async context => {
+  const app = await createMemoryTestApp(context);
+  const login = await loginWithMockWechat(app, "test-vault-item");
+
+  await app.inject({
+    method: "POST",
+    url: "/api/v1/privacy/config/update",
+    ...authJsonRequest(login.accessToken, {
+      clientMutationId: "vault-config-e2ee",
+      payload: {
+        cipherAlgorithm: "xchacha20-poly1305",
+        e2eeEnabled: true,
+        keyVersion: 3,
+        recoveryEnabled: false,
+        storageMode: "e2ee",
+      },
+    }),
+  });
+
+  const createResponse = await saveVaultItemViaApi(app, login.accessToken, {
+    ciphertext: "ciphertext-v1",
+    clientMutationId: "vault-save-create",
+    contentHash: "hash-v1",
+    keyVersion: 3,
+    nonce: "nonce-v1",
+  });
+  const duplicateResponse = await saveVaultItemViaApi(app, login.accessToken, {
+    ciphertext: "ciphertext-duplicate",
+    clientMutationId: "vault-save-create",
+    contentHash: "hash-duplicate",
+    keyVersion: 3,
+    nonce: "nonce-duplicate",
+  });
+  const updateResponse = await saveVaultItemViaApi(app, login.accessToken, {
+    ciphertext: "ciphertext-v2",
+    clientMutationId: "vault-save-update",
+    contentHash: "hash-v2",
+    keyVersion: 4,
+    nonce: "nonce-v2",
+  });
+  const createBody = parseApiResponse<VaultItemData>(createResponse);
+  const duplicateBody = parseApiResponse<VaultItemData>(duplicateResponse);
+  const updateBody = parseApiResponse<VaultItemData>(updateResponse);
+
+  assert.equal(createResponse.statusCode, 200);
+  assert.equal(duplicateResponse.statusCode, 200);
+  assert.equal(updateResponse.statusCode, 200);
+  assert.equal(createBody.data.operation, "create");
+  assert.equal(duplicateBody.data.item.id, createBody.data.item.id);
+  assert.equal(duplicateBody.data.item.contentHash, "hash-v1");
+  assert.equal(updateBody.data.operation, "update");
+  assert.equal(updateBody.data.item.id, createBody.data.item.id);
+  assert.equal(updateBody.data.item.contentHash, "hash-v2");
+  assert.equal(updateBody.data.item.keyVersion, 4);
+
+  const listResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/privacy/vault-items?limit=10",
+  });
+  const listBody = parseApiResponse<VaultItemsPageData>(listResponse);
+
+  assert.equal(listResponse.statusCode, 200);
+  assert.equal(listBody.data.items.length, 1);
+  assert.equal(listBody.data.items[0]?.ciphertext, "ciphertext-v2");
+
+  const syncResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/sync/changes?afterVersion=0&limit=20",
+  });
+  const syncBody = parseApiResponse<SyncChangesData>(syncResponse);
+  const vaultChanges = syncBody.data.items.filter(item => item.entityType === "vault_item");
+
+  assert.deepEqual(
+    vaultChanges.map(change => change.operation),
+    ["create", "update"],
+  );
+  assert.deepEqual(
+    vaultChanges.map(change => change.clientMutationId),
+    ["vault-save-create", "vault-save-update"],
+  );
+});
+
 test("备份快照支持创建、详情、恢复审计和软删除", async context => {
   const app = await createMemoryTestApp(context);
   const login = await loginWithMockWechat(app, "test-backup-flow");
@@ -721,6 +912,44 @@ function createBackupSnapshotViaApi(
         sizeBytes: input.snapshotCiphertext.length,
         snapshotCiphertext: input.snapshotCiphertext,
         snapshotHash: input.snapshotHash,
+      },
+    }),
+  });
+}
+
+/**
+ * 通过 HTTP 保存端到端加密条目。
+ *
+ * @param app Fastify 测试应用。
+ * @param accessToken 后端签发的 access token。
+ * @param input vault item 测试输入。
+ * @returns Fastify inject 响应。
+ */
+function saveVaultItemViaApi(
+  app: FastifyInstance,
+  accessToken: string,
+  input: {
+    ciphertext: string;
+    clientMutationId: string;
+    contentHash: string;
+    keyVersion: number;
+    nonce: string;
+  },
+) {
+  return app.inject({
+    method: "POST",
+    url: "/api/v1/privacy/vault-items/save",
+    ...authJsonRequest(accessToken, {
+      clientMutationId: input.clientMutationId,
+      payload: {
+        aad: "period-record-aad",
+        algorithm: "xchacha20-poly1305",
+        ciphertext: input.ciphertext,
+        contentHash: input.contentHash,
+        entityId: "local-period-vault-001",
+        entityType: "period_record",
+        keyVersion: input.keyVersion,
+        nonce: input.nonce,
       },
     }),
   });

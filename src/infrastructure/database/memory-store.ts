@@ -94,13 +94,43 @@ export interface BackupSnapshotRecord {
   deletedAt: string | null;
 }
 
+export type PrivacyStorageMode = "plain" | "encrypted" | "e2ee";
+export type PrivacyCipherAlgorithm = "none" | "aes-256-gcm" | "xchacha20-poly1305";
+
+export interface PrivacyConfigRecord {
+  userId: string;
+  storageMode: PrivacyStorageMode;
+  cipherAlgorithm: PrivacyCipherAlgorithm;
+  keyVersion: number;
+  e2eeEnabled: boolean;
+  recoveryEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /**
  * 可参与前端增量同步的实体类型。
  *
- * 其中备份、隐私配置和保险箱实体当前还未开放接口，但保留枚举值便于后续模块接入
- * `sync_change_logs` 时保持统一协议。
+ * 备份、隐私配置和保险箱实体均通过该枚举接入 `sync_change_logs`，让前端在跨设备
+ * 拉取增量时可以使用同一套实体协议。
  */
 export type SyncEntityType = "user_profile" | "cycle_settings" | "period_record" | "backup_snapshot" | "privacy_config" | "vault_item";
+
+export interface EncryptedVaultItemRecord {
+  id: string;
+  userId: string;
+  entityType: SyncEntityType;
+  entityId: string;
+  algorithm: Exclude<PrivacyCipherAlgorithm, "none">;
+  keyVersion: number;
+  nonce: string;
+  aad: string | null;
+  ciphertext: string;
+  contentHash: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
 
 /**
  * 同步变更操作类型。
@@ -151,10 +181,12 @@ export interface MemoryStore {
   backupSnapshots: Map<string, BackupSnapshotRecord>;
   cycleSettings: Map<string, CycleSettingsRecord>;
   devices: Map<string, UserDeviceRecord>;
+  encryptedVaultItems: Map<string, EncryptedVaultItemRecord>;
   mutations: Map<string, MutationRecord>;
   nextAuditLogId: number;
   nextSyncChangeId: number;
   periodRecords: Map<string, PeriodRecord>;
+  privacyConfigs: Map<string, PrivacyConfigRecord>;
   profiles: Map<string, UserProfileRecord>;
   syncChangeLogs: SyncChangeLogRecord[];
   users: Map<string, AppUserRecord>;
@@ -166,10 +198,12 @@ export const memoryStore: MemoryStore = {
   backupSnapshots: new Map(),
   cycleSettings: new Map(),
   devices: new Map(),
+  encryptedVaultItems: new Map(),
   mutations: new Map(),
   nextAuditLogId: 1,
   nextSyncChangeId: 1,
   periodRecords: new Map(),
+  privacyConfigs: new Map(),
   profiles: new Map(),
   syncChangeLogs: [],
   users: new Map(),
@@ -187,10 +221,12 @@ export function resetMemoryStore(): void {
   memoryStore.backupSnapshots.clear();
   memoryStore.cycleSettings.clear();
   memoryStore.devices.clear();
+  memoryStore.encryptedVaultItems.clear();
   memoryStore.mutations.clear();
   memoryStore.nextAuditLogId = 1;
   memoryStore.nextSyncChangeId = 1;
   memoryStore.periodRecords.clear();
+  memoryStore.privacyConfigs.clear();
   memoryStore.profiles.clear();
   memoryStore.syncChangeLogs.length = 0;
   memoryStore.users.clear();
@@ -231,6 +267,16 @@ export function createDefaultUserBundle(): AppUserRecord {
     reminderDaysAhead: 3,
     reminderEnabled: false,
     reminderTime: "09:00",
+    updatedAt: timestamp,
+    userId: user.id,
+  });
+  memoryStore.privacyConfigs.set(user.id, {
+    cipherAlgorithm: "none",
+    createdAt: timestamp,
+    e2eeEnabled: false,
+    keyVersion: 1,
+    recoveryEnabled: false,
+    storageMode: "plain",
     updatedAt: timestamp,
     userId: user.id,
   });

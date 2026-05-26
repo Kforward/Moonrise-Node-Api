@@ -99,10 +99,16 @@ export interface BackupRepository {
    *
    * @param userId 用户 ID。
    * @param keepLatestCount 需要保留的最新有效快照数量。
+   * @param protectedSnapshotId 本次刚创建、必须保留的快照 ID。
    * @param deletedAt 软删除时间。
    * @returns 被保留策略软删除的快照列表。
    */
-  pruneSnapshots(userId: string, keepLatestCount: number, deletedAt: string): Promise<BackupSnapshotRecord[]>;
+  pruneSnapshots(
+    userId: string,
+    keepLatestCount: number,
+    protectedSnapshotId: string,
+    deletedAt: string,
+  ): Promise<BackupSnapshotRecord[]>;
 }
 
 /**

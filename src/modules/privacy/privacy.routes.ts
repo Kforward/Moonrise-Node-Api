@@ -1,37 +1,45 @@
 import type { FastifyInstance } from "fastify";
-import { registerPlaceholderRoutes } from "../../common/utils/register-placeholder-routes";
+import { requireCurrentSession } from "../../common/middlewares/auth-context";
+import { buildSuccessResponse } from "../../common/responses/api-response";
+import { validateWithZod } from "../../common/validators/validate-with-zod";
 import { appEnv } from "../../infrastructure/config/env";
+import { listVaultItemsQuerySchema, saveVaultItemSchema, updatePrivacyConfigSchema } from "./privacy.dto";
+import { getPrivacyConfig, listVaultItems, saveVaultItem, updatePrivacyConfig } from "./privacy.service";
 
 /**
- * 注册隐私安全模块路由骨架。
+ * 注册隐私安全模块路由。
  *
- * 后续该模块负责隐私配置、加密模式、密钥版本和端到端加密条目托管。
+ * 该模块负责隐私配置、加密模式、密钥版本和端到端加密条目托管。
  *
  * @param app Fastify 应用实例。
  */
 export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void> {
   const basePath = `${appEnv.apiPrefix}/privacy`;
 
-  await registerPlaceholderRoutes(app, "privacy", [
-    {
-      method: "GET",
-      nextStep: "读取当前用户 privacy_configs",
-      path: `${basePath}/config`,
-    },
-    {
-      method: "POST",
-      nextStep: "更新加密模式、算法和 key_version，并写审计日志",
-      path: `${basePath}/config/update`,
-    },
-    {
-      method: "POST",
-      nextStep: "保存端到端加密 vault item，不接触明文",
-      path: `${basePath}/vault-items/save`,
-    },
-    {
-      method: "GET",
-      nextStep: "拉取当前用户 encrypted_vault_items",
-      path: `${basePath}/vault-items`,
-    },
-  ]);
+  app.get(`${basePath}/config`, async request => {
+    const currentSession = requireCurrentSession(request);
+
+    return buildSuccessResponse(request.id, await getPrivacyConfig(currentSession));
+  });
+
+  app.post(`${basePath}/config/update`, async request => {
+    const currentSession = requireCurrentSession(request);
+    const input = validateWithZod(updatePrivacyConfigSchema, request.body);
+
+    return buildSuccessResponse(request.id, await updatePrivacyConfig(currentSession, input));
+  });
+
+  app.post(`${basePath}/vault-items/save`, async request => {
+    const currentSession = requireCurrentSession(request);
+    const input = validateWithZod(saveVaultItemSchema, request.body);
+
+    return buildSuccessResponse(request.id, await saveVaultItem(currentSession, input));
+  });
+
+  app.get(`${basePath}/vault-items`, async request => {
+    const currentSession = requireCurrentSession(request);
+    const query = validateWithZod(listVaultItemsQuerySchema, request.query);
+
+    return buildSuccessResponse(request.id, await listVaultItems(currentSession, query));
+  });
 }

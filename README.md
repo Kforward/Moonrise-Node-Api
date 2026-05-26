@@ -11,12 +11,12 @@ Moonrise Node API 是面向 Moonrise 小程序/前端应用的后端服务，当
 - `cycle`：周期设置、经期记录创建/编辑/完成/软删除、日期重叠校验。
 - `sync`：同步日志、同步水位、增量拉取、`/sync/push` 批量离线变更处理、幂等响应快照。
 - `backup`：云端备份快照创建、列表、详情、恢复审计、软删除、最近 5 条有效快照保留策略。
+- `privacy`：隐私配置读取/切换、密钥版本记录、端到端加密条目密文托管、隐私配置与 vault item 同步日志。
 - `audit`：内部审计日志能力，已被登录、设备、备份等流程调用。
-- PostgreSQL/Drizzle：完整 schema 和迁移文件已落地，`auth`、`users`、`cycle`、`sync`、`idempotency`、`backup` 已具备内存/PostgreSQL 双仓储实现。
+- PostgreSQL/Drizzle：完整 schema 和迁移文件已落地，`auth`、`users`、`cycle`、`sync`、`idempotency`、`backup`、`privacy` 已具备内存/PostgreSQL 双仓储实现。
 
 仍是占位或待扩展能力：
 
-- `privacy`：隐私配置、加密模式、密钥版本、端到端加密条目托管仍是占位路由。
 - PostgreSQL 集成测试、安全失败路径测试、限流等生产强化能力仍需继续补齐。
 
 ## 技术栈
@@ -205,10 +205,10 @@ Content-Type: application/json
 
 隐私安全：
 
-- `GET /privacy/config`：占位，当前返回 `501 NOT_IMPLEMENTED`
-- `POST /privacy/config/update`：占位，当前返回 `501 NOT_IMPLEMENTED`
-- `POST /privacy/vault-items/save`：占位，当前返回 `501 NOT_IMPLEMENTED`
-- `GET /privacy/vault-items`：占位，当前返回 `501 NOT_IMPLEMENTED`
+- `GET /privacy/config`
+- `POST /privacy/config/update`
+- `POST /privacy/vault-items/save`
+- `GET /privacy/vault-items`
 
 更详细的请求体和业务规则请看 `backend_ai_docs/03_api_design.md` 与 `backend_ai_docs/02_business_rules.md`。
 
@@ -227,6 +227,9 @@ Content-Type: application/json
 
 - `user_profile.update`
 - `cycle_settings.update`
+- `privacy_config.update`
+- `vault_item.create`
+- `vault_item.update`
 - `period_record.create`
 - `period_record.update`
 - `period_record.delete`
@@ -256,6 +259,8 @@ Content-Type: application/json
 - 经期记录重叠校验
 - 同步日志与同步水位
 - `/sync/push` 批量成功、局部失败和重复提交
+- 隐私配置读取/切换、幂等、同步日志和审计
+- vault item 密文托管 upsert、幂等和同步日志
 - 备份快照创建、列表、详情、恢复审计、软删除和最近 5 条保留策略
 
 运行：
@@ -321,6 +326,5 @@ backend_ai_docs/
 
 当前路线请以 `backend_ai_docs/07_migration_roadmap.md` 为准。近期优先事项：
 
-- 落地 `privacy` 模块真实业务。
 - 扩展 PostgreSQL 仓储集成测试。
 - 补充安全失败路径测试与限流能力。

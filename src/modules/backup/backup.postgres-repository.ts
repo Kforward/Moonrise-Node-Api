@@ -127,7 +127,12 @@ export const postgresBackupRepository: BackupRepository = {
    * @param deletedAt 软删除时间。
    * @returns 被软删除的快照列表。
    */
-  async pruneSnapshots(userId: string, keepLatestCount: number, deletedAt: string): Promise<BackupSnapshotRecord[]> {
+  async pruneSnapshots(
+    userId: string,
+    keepLatestCount: number,
+    protectedSnapshotId: string,
+    deletedAt: string,
+  ): Promise<BackupSnapshotRecord[]> {
     const activeSnapshots = await getDatabase()
       .select()
       .from(backupSnapshots)
@@ -136,7 +141,13 @@ export const postgresBackupRepository: BackupRepository = {
         isNull(backupSnapshots.deletedAt),
       ))
       .orderBy(desc(backupSnapshots.createdAt));
-    const snapshotsToDelete = activeSnapshots.slice(keepLatestCount);
+    const protectedSnapshot = activeSnapshots.find(snapshot => snapshot.id === protectedSnapshotId);
+    const otherSnapshots = activeSnapshots.filter(snapshot => snapshot.id !== protectedSnapshotId);
+    const snapshotsToKeep = new Set([
+      ...(protectedSnapshot ? [protectedSnapshot.id] : []),
+      ...otherSnapshots.slice(0, Math.max(keepLatestCount - 1, 0)).map(snapshot => snapshot.id),
+    ]);
+    const snapshotsToDelete = activeSnapshots.filter(snapshot => !snapshotsToKeep.has(snapshot.id));
     const deletedSnapshots: BackupSnapshotRecord[] = [];
 
     for (const snapshot of snapshotsToDelete) {

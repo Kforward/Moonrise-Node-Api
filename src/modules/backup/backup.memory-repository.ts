@@ -105,8 +105,20 @@ export const memoryBackupRepository: BackupRepository = {
    * @param deletedAt 软删除时间。
    * @returns 被软删除的快照列表。
    */
-  async pruneSnapshots(userId: string, keepLatestCount: number, deletedAt: string): Promise<BackupSnapshotRecord[]> {
-    const snapshotsToDelete = listActiveSnapshots(userId).slice(keepLatestCount);
+  async pruneSnapshots(
+    userId: string,
+    keepLatestCount: number,
+    protectedSnapshotId: string,
+    deletedAt: string,
+  ): Promise<BackupSnapshotRecord[]> {
+    const sortedSnapshots = listActiveSnapshots(userId);
+    const protectedSnapshot = sortedSnapshots.find(snapshot => snapshot.id === protectedSnapshotId);
+    const otherSnapshots = sortedSnapshots.filter(snapshot => snapshot.id !== protectedSnapshotId);
+    const snapshotsToKeep = new Set([
+      ...(protectedSnapshot ? [protectedSnapshot.id] : []),
+      ...otherSnapshots.slice(0, Math.max(keepLatestCount - 1, 0)).map(snapshot => snapshot.id),
+    ]);
+    const snapshotsToDelete = sortedSnapshots.filter(snapshot => !snapshotsToKeep.has(snapshot.id));
 
     for (const snapshot of snapshotsToDelete) {
       snapshot.deletedAt = deletedAt;

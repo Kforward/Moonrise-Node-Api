@@ -20,6 +20,8 @@ import {
   updateCycleSettings,
   updatePeriodRecord,
 } from "../cycle/cycle.service";
+import { saveVaultItemSchema, updatePrivacyConfigSchema } from "../privacy/privacy.dto";
+import { saveVaultItem, updatePrivacyConfig } from "../privacy/privacy.service";
 import { updateUserProfileSchema } from "../users/users.dto";
 import { updateCurrentUserProfile } from "../users/users.service";
 import type { ListSyncChangesQuery, SyncPushChangeInput, SyncPushInput } from "./sync.dto";
@@ -212,6 +214,14 @@ async function dispatchSyncPushChange(currentSession: CurrentSession, change: Sy
 
   if (change.entityType === "cycle_settings" && change.operation === "update") {
     return updateCycleSettings(currentSession, validateWithZod(updateCycleSettingsSchema, buildMutationInput(change)));
+  }
+
+  if (change.entityType === "privacy_config" && change.operation === "update") {
+    return updatePrivacyConfig(currentSession, validateWithZod(updatePrivacyConfigSchema, buildMutationInput(change)));
+  }
+
+  if (change.entityType === "vault_item" && (change.operation === "create" || change.operation === "update")) {
+    return saveVaultItem(currentSession, validateWithZod(saveVaultItemSchema, buildMutationInput(change)));
   }
 
   if (change.entityType === "period_record") {

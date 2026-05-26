@@ -233,13 +233,14 @@ export async function deleteBackupSnapshot(currentSession: CurrentSession, input
  */
 async function pruneOldBackupSnapshots(userId: string, deviceId: string, latestSnapshotId: string): Promise<void> {
   const deletedAt = nowIso();
-  const deletedSnapshots = await getBackupRepository().pruneSnapshots(userId, BACKUP_RETENTION_COUNT, deletedAt);
+  const deletedSnapshots = await getBackupRepository().pruneSnapshots(
+    userId,
+    BACKUP_RETENTION_COUNT,
+    latestSnapshotId,
+    deletedAt,
+  );
 
   for (const deletedSnapshot of deletedSnapshots) {
-    if (deletedSnapshot.id === latestSnapshotId) {
-      continue;
-    }
-
     await appendAuditLog({
       action: "backup_snapshot.prune",
       deviceId,
