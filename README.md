@@ -17,7 +17,7 @@ Moonrise Node API 是面向 Moonrise 小程序/前端应用的后端服务，当
 
 仍是占位或待扩展能力：
 
-- PostgreSQL 集成测试、安全失败路径测试、限流等生产强化能力仍需继续补齐。
+- PostgreSQL 集成测试、Redis/多实例限流适配等生产强化能力仍需继续补齐。
 
 ## 技术栈
 
@@ -254,6 +254,8 @@ Content-Type: application/json
 
 - 微信 mock 登录
 - refresh token 轮换与旧 token 失效
+- 认证安全失败路径
+- 微信登录限流
 - 用户资料更新幂等
 - 经期记录幂等创建
 - 经期记录重叠校验

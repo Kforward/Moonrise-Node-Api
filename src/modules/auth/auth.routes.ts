@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { requireCurrentSession } from "../../common/middlewares/auth-context";
+import { createFixedWindowRateLimitPreHandler } from "../../common/middlewares/rate-limit";
 import { buildSuccessResponse } from "../../common/responses/api-response";
 import { validateWithZod } from "../../common/validators/validate-with-zod";
 import { appEnv } from "../../infrastructure/config/env";
@@ -15,14 +16,24 @@ import { refreshTokenSchema, wechatLoginSchema } from "./auth.dto";
  */
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   const basePath = `${appEnv.apiPrefix}/auth`;
+  const loginRateLimit = createFixedWindowRateLimitPreHandler({
+    max: 5,
+    namespace: "auth.wechat.login",
+    windowMs: 60_000,
+  });
+  const refreshRateLimit = createFixedWindowRateLimitPreHandler({
+    max: 10,
+    namespace: "auth.refresh",
+    windowMs: 60_000,
+  });
 
-  app.post(`${basePath}/wechat/login`, async request => {
+  app.post(`${basePath}/wechat/login`, { preHandler: loginRateLimit }, async request => {
     const input = validateWithZod(wechatLoginSchema, request.body);
 
     return buildSuccessResponse(request.id, await loginWithWechat(input));
   });
 
-  app.post(`${basePath}/refresh`, async request => {
+  app.post(`${basePath}/refresh`, { preHandler: refreshRateLimit }, async request => {
     const input = validateWithZod(refreshTokenSchema, request.body);
 
     return buildSuccessResponse(request.id, await refreshSession(input));

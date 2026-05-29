@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { requireCurrentSession } from "../../common/middlewares/auth-context";
+import { createFixedWindowRateLimitPreHandler } from "../../common/middlewares/rate-limit";
 import { buildSuccessResponse } from "../../common/responses/api-response";
 import { validateWithZod } from "../../common/validators/validate-with-zod";
 import { appEnv } from "../../infrastructure/config/env";
@@ -27,6 +28,11 @@ import {
  */
 export async function registerBackupRoutes(app: FastifyInstance): Promise<void> {
   const basePath = `${appEnv.apiPrefix}/backups`;
+  const createSnapshotRateLimit = createFixedWindowRateLimitPreHandler({
+    max: 10,
+    namespace: "backups.create",
+    windowMs: 60_000,
+  });
 
   app.get(basePath, async request => {
     const currentSession = requireCurrentSession(request);
@@ -35,7 +41,7 @@ export async function registerBackupRoutes(app: FastifyInstance): Promise<void> 
     return buildSuccessResponse(request.id, await listBackupSnapshots(currentSession, query));
   });
 
-  app.post(`${basePath}/create`, async request => {
+  app.post(`${basePath}/create`, { preHandler: createSnapshotRateLimit }, async request => {
     const currentSession = requireCurrentSession(request);
     const input = validateWithZod(createBackupSnapshotSchema, request.body);
 

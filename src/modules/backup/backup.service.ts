@@ -15,7 +15,7 @@ import type {
   ListBackupSnapshotsQuery,
   RestoreBackupSnapshotInput,
 } from "./backup.dto";
-import { getBackupRepository } from "./backup.repository";
+import { getBackupRepository, type BackupRepository } from "./backup.repository";
 
 const BACKUP_RETENTION_COUNT = 5;
 
@@ -100,7 +100,7 @@ export async function createBackupSnapshot(currentSession: CurrentSession, input
       });
     }
 
-    const timestamp = nowIso();
+    const timestamp = await nextBackupSnapshotTimestamp(session.user.id, backupRepository);
     const snapshot = await backupRepository.createSnapshot({
       algorithm: input.payload.algorithm,
       clientBackupId: input.payload.clientBackupId,
@@ -259,6 +259,31 @@ async function pruneOldBackupSnapshots(userId: string, deviceId: string, latestS
       userId,
     });
   }
+}
+
+/**
+ * 生成严格晚于当前最新快照的创建时间。
+ *
+ * 快速连续备份时，JavaScript 时间可能落在同一毫秒；如果直接按 `createdAt` 倒序排序，
+ * 最近 5 条保留策略和列表首项会变得不稳定。这里在 service 层保证单用户快照时间单调递增，
+ * 后续切换为数据库时间或序列字段时可集中替换。
+ *
+ * @param userId 用户 ID。
+ * @param backupRepository 备份仓储实现。
+ * @returns 可用于新快照 `createdAt` 和 `updatedAt` 的 ISO 时间。
+ */
+async function nextBackupSnapshotTimestamp(userId: string, backupRepository: BackupRepository): Promise<string> {
+  const currentTimestamp = nowIso();
+  const latestPage = await backupRepository.listSnapshots(userId, {
+    limit: 1,
+  });
+  const latestSnapshot = latestPage.items[0];
+
+  if (!latestSnapshot || latestSnapshot.createdAt < currentTimestamp) {
+    return currentTimestamp;
+  }
+
+  return new Date(new Date(latestSnapshot.createdAt).getTime() + 1).toISOString();
 }
 
 /**

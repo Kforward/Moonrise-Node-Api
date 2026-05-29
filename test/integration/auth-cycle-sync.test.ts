@@ -159,6 +159,10 @@ interface SyncPushData {
   successCount: number;
 }
 
+interface RateLimitedData {
+  retryAfterSeconds: number;
+}
+
 /**
  * 创建内存模式测试应用。
  *
@@ -268,6 +272,77 @@ async function loginWithMockWechat(app: FastifyInstance, code: string): Promise<
 
   return body.data;
 }
+
+test("认证安全失败路径会返回稳定错误码", async context => {
+  const app = await createMemoryTestApp(context);
+  const unauthenticatedResponse = await app.inject({
+    method: "GET",
+    url: "/api/v1/users/me",
+  });
+  const unauthenticatedBody = parseApiResponse<null>(unauthenticatedResponse);
+
+  assert.equal(unauthenticatedResponse.statusCode, 401);
+  assert.equal(unauthenticatedBody.success, false);
+  assert.equal(unauthenticatedBody.code, "UNAUTHORIZED");
+
+  const invalidRefreshResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/auth/refresh",
+    ...jsonRequest({
+      refreshToken: "invalid-refresh-token",
+    }),
+  });
+  const invalidRefreshBody = parseApiResponse<null>(invalidRefreshResponse);
+
+  assert.equal(invalidRefreshResponse.statusCode, 401);
+  assert.equal(invalidRefreshBody.success, false);
+  assert.equal(invalidRefreshBody.code, "INVALID_TOKEN");
+
+  const login = await loginWithMockWechat(app, "test-security-failure-paths");
+  const logoutResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "POST",
+    url: "/api/v1/auth/logout",
+  });
+
+  assert.equal(logoutResponse.statusCode, 200);
+
+  const revokedSessionResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/auth/session",
+  });
+  const revokedSessionBody = parseApiResponse<null>(revokedSessionResponse);
+
+  assert.equal(revokedSessionResponse.statusCode, 401);
+  assert.equal(revokedSessionBody.success, false);
+  assert.equal(revokedSessionBody.code, "SESSION_REVOKED");
+});
+
+test("微信登录接口达到限流阈值后返回 RATE_LIMITED", async context => {
+  const app = await createMemoryTestApp(context);
+
+  for (let index = 1; index <= 5; index += 1) {
+    await loginWithMockWechat(app, `test-login-rate-limit-${index}`);
+  }
+
+  const limitedResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/auth/wechat/login",
+    ...jsonRequest({
+      code: "test-login-rate-limit-6",
+      deviceKey: "test-login-rate-limit-6-device-key",
+      deviceName: "Codex Test Device",
+      platform: "h5",
+    }),
+  });
+  const limitedBody = parseApiResponse<RateLimitedData>(limitedResponse);
+
+  assert.equal(limitedResponse.statusCode, 429);
+  assert.equal(limitedBody.success, false);
+  assert.equal(limitedBody.code, "RATE_LIMITED");
+  assert.equal(limitedBody.data.retryAfterSeconds > 0, true);
+});
 
 test("微信登录后 refresh token 会轮换并废弃旧 token", async context => {
   const app = await createMemoryTestApp(context);
