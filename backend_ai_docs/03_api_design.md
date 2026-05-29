@@ -86,7 +86,7 @@
 | `POST` | `/api/v1/sync/push` | 批量推送离线变更 |
 | `GET` | `/api/v1/sync/state` | 获取服务器同步水位 |
 
-`/sync/push` 当前支持批量提交已落地的 `user_profile.update`、`cycle_settings.update` 和 `period_record.create/update/delete/finish`。请求示例：
+`/sync/push` 当前支持批量提交已落地的 `user_profile.update`、`cycle_settings.update`、`privacy_config.update`、`vault_item.create/update` 和 `period_record.create/update/delete/finish`。请求示例：
 
 ```json
 {

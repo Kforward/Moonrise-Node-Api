@@ -10,5 +10,5 @@ npm run db:generate
 npm run db:migrate
 ```
 
-当前业务接口仍默认使用内存仓储；当 `DATABASE_DRIVER=postgresql` 且 `DATABASE_URL`
-配置完成后，后续仓储迁移会逐步接入这些表。
+当前业务接口默认仍使用内存仓储，便于本地联调；当 `DATABASE_DRIVER=postgresql` 且
+`DATABASE_URL` 配置完成后，已落地模块会切换到对应 PostgreSQL 仓储实现。
