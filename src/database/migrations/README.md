@@ -12,3 +12,12 @@ npm run db:migrate
 
 当前业务接口默认仍使用内存仓储，便于本地联调；当 `DATABASE_DRIVER=postgresql` 且
 `DATABASE_URL` 配置完成后，已落地模块会切换到对应 PostgreSQL 仓储实现。
+
+PostgreSQL 仓储集成测试会清空业务表，只能连接独立测试库。建议数据库名称包含 `test`，
+例如 `moonrise_test`；完成迁移后再显式运行：
+
+```powershell
+$env:RUN_POSTGRES_TESTS="1"
+$env:DATABASE_URL="postgresql://moonrise:moonrise_password@localhost:5432/moonrise_test"
+npm run test:postgres
+```

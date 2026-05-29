@@ -53,6 +53,7 @@ npm test                 # typecheck + integration tests
 npm run lint             # ESLint 检查 src
 npm run typecheck        # TypeScript 类型检查
 npm run test:integration # 仅运行集成测试
+npm run test:postgres    # 可选 PostgreSQL 仓储集成测试，需要显式测试库
 ```
 
 ## 环境变量
@@ -98,6 +99,15 @@ npm run db:studio
 ```
 
 当前集成测试默认强制使用 `DATABASE_DRIVER=memory`。切换到 PostgreSQL 模式前，请先确认目标数据库已创建并完成迁移。
+
+PostgreSQL 仓储集成测试默认不会随 `npm test` 执行，避免误清理开发库。运行前请使用名称包含 `test` 的独立数据库，完成迁移后显式开启：
+
+```powershell
+$env:RUN_POSTGRES_TESTS="1"
+$env:DATABASE_URL="postgresql://moonrise:moonrise_password@localhost:5432/moonrise_test"
+npm run db:migrate
+npm run test:postgres
+```
 
 已建核心表包括：
 
@@ -264,6 +274,7 @@ Content-Type: application/json
 - 隐私配置读取/切换、幂等、同步日志和审计
 - vault item 密文托管 upsert、幂等和同步日志
 - 备份快照创建、列表、详情、恢复审计、软删除和最近 5 条保留策略
+- PostgreSQL 仓储核心链路、幂等快照和同步日志（需显式运行 `npm run test:postgres`）
 
 运行：
 
