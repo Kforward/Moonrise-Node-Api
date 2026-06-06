@@ -69,7 +69,7 @@ CORS_ORIGIN=*
 LOG_LEVEL=info
 
 DATABASE_DRIVER=memory
-DATABASE_URL=postgresql://moonrise:moonrise_password@localhost:5432/moonrise
+DATABASE_URL=postgresql://moonrise_test_user:moonrise_test_password@localhost:5432/moonrise_test
 
 JWT_ACCESS_SECRET=change-me-access-secret
 JWT_REFRESH_SECRET=change-me-refresh-secret
@@ -84,6 +84,7 @@ WECHAT_MINIPROGRAM_APP_SECRET=
 - `DATABASE_DRIVER=memory` 是默认开发模式，不需要本地 PostgreSQL。
 - `DATABASE_DRIVER=memory` 的数据只保存在当前进程内，服务重启后会清空，适合前端快速联调。
 - `DATABASE_DRIVER=postgresql` 会启用 Drizzle/PostgreSQL 仓储，需要配置 `DATABASE_URL` 并执行迁移。
+- 测试环境和生产环境必须使用独立数据库，推荐 `moonrise_test` 与 `moonrise_prod`，不要共用 `moonrise`。
 - 开发环境默认 `WECHAT_LOGIN_MODE=mock`，前端可用任意非空 `code` 联调登录。
 - 真实微信登录使用 `WECHAT_LOGIN_MODE=code2session`，并配置 `WECHAT_MINIPROGRAM_APP_ID` 与 `WECHAT_MINIPROGRAM_APP_SECRET`。
 - 生产环境必须使用 `code2session`；微信 `session_key` 不落库，也不会返回前端。
@@ -91,6 +92,7 @@ WECHAT_MINIPROGRAM_APP_SECRET=
 ## 数据库
 
 当前 schema 位于 `src/infrastructure/database/schema.ts`，迁移文件位于 `src/database/migrations/`。
+数据库隔离初始化模板位于 `backend_ai_docs/database/environment_isolation.sql`。
 
 ```bash
 npm run db:generate
@@ -104,10 +106,13 @@ PostgreSQL 仓储集成测试默认不会随 `npm test` 执行，避免误清理
 
 ```powershell
 $env:RUN_POSTGRES_TESTS="1"
-$env:DATABASE_URL="postgresql://moonrise:moonrise_password@localhost:5432/moonrise_test"
+$env:DATABASE_URL="postgresql://moonrise_test_user:moonrise_test_password@localhost:5432/moonrise_test"
 npm run db:migrate
 npm run test:postgres
 ```
+
+生产环境请基于 `.env.production.example` 配置 `moonrise_prod` 和强随机密钥；测试/联调环境请基于 `.env.test.example`
+配置 `moonrise_test`。两个环境分别执行 `npm run db:migrate`。
 
 已建核心表包括：
 

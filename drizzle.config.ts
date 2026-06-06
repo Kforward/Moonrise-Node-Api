@@ -7,7 +7,7 @@ import { defineConfig } from "drizzle-kit";
  * 该值只用于本地执行 `db:generate / db:migrate` 时缺少 `.env` 的情况，生产环境必须
  * 显式提供 `DATABASE_URL`，业务运行时不会从这里读取数据库配置。
  */
-const fallbackDatabaseUrl = "postgresql://moonrise:moonrise_password@localhost:5432/moonrise";
+const fallbackDatabaseUrl = "postgresql://moonrise_test_user:moonrise_test_password@localhost:5432/moonrise_test";
 
 export default defineConfig({
   dbCredentials: {

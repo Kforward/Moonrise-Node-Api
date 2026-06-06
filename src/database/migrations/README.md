@@ -18,6 +18,10 @@ PostgreSQL 仓储集成测试会清空业务表，只能连接独立测试库。
 
 ```powershell
 $env:RUN_POSTGRES_TESTS="1"
-$env:DATABASE_URL="postgresql://moonrise:moonrise_password@localhost:5432/moonrise_test"
+$env:DATABASE_URL="postgresql://moonrise_test_user:moonrise_test_password@localhost:5432/moonrise_test"
 npm run test:postgres
 ```
+
+测试环境和生产环境应使用独立数据库与独立角色，推荐 `moonrise_test` / `moonrise_test_user`
+和 `moonrise_prod` / `moonrise_prod_user`。建库与授权模板见
+`backend_ai_docs/database/environment_isolation.sql`。
