@@ -1,5 +1,7 @@
 # 03 API 设计草案
 
+> 前端联调请优先使用 `backend_ai_docs/openapi.json`。该 OpenAPI 文件按当前代码中的路由、DTO 和公开响应结构维护，可直接导入 Apifox、Postman 或 Swagger；本文档主要保留业务说明、接口分组和设计约束。
+
 ## 1. 通用响应
 
 后端接口只使用 `GET` 与 `POST`：

@@ -1,0 +1,3723 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Moonrise Node API",
+    "version": "1.0.0",
+    "description": "Moonrise 后端当前可用接口契约，供前端联调导入 Apifox、Postman 或 Swagger。本文档以当前代码中的路由、DTO 和公开响应结构为准；本地联调默认使用 DATABASE_DRIVER=memory。"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/api/v1",
+      "description": "本地开发默认地址"
+    }
+  ],
+  "tags": [
+    {
+      "name": "health",
+      "description": "服务健康检查"
+    },
+    {
+      "name": "auth",
+      "description": "微信登录、token 刷新和设备会话"
+    },
+    {
+      "name": "users",
+      "description": "当前用户资料和设备管理"
+    },
+    {
+      "name": "cycle",
+      "description": "周期设置和经期记录"
+    },
+    {
+      "name": "sync",
+      "description": "增量同步与离线变更推送"
+    },
+    {
+      "name": "backups",
+      "description": "云端密文快照备份"
+    },
+    {
+      "name": "privacy",
+      "description": "隐私配置与端到端密文条目"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "健康检查",
+        "operationId": "getHealth",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "服务可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/auth/wechat/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "微信小程序登录",
+        "description": "开发环境 WECHAT_LOGIN_MODE=mock 时，code 会被当作稳定 mock openid；生产环境会调用微信 jscode2session。",
+        "operationId": "loginWithWechat",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WechatLoginRequest"
+              },
+              "example": {
+                "code": "dev-code",
+                "deviceKey": "local-device-001",
+                "deviceName": "开发设备",
+                "platform": "mp-weixin"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "登录成功，返回 token、用户资料和设备信息",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthLoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/WechatLoginFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "502": {
+            "$ref": "#/components/responses/WechatLoginFailed"
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "刷新 token",
+        "description": "refresh token 会轮换；旧 refresh token 再次提交会返回 INVALID_TOKEN。",
+        "operationId": "refreshSession",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "刷新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthRefreshResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidToken"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "当前设备退出登录",
+        "operationId": "logoutSession",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "退出成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthLogoutResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/auth/session": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "获取当前会话",
+        "operationId": "getCurrentSession",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前会话有效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "获取当前用户资料",
+        "operationId": "getCurrentUserProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前用户资料",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/users/me/update": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "更新当前用户资料",
+        "description": "写接口必须传 clientMutationId；手机号、邮箱和扩展资料只接收密文字段。",
+        "operationId": "updateCurrentUserProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "资料更新成功；重复 clientMutationId 返回首次响应快照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/UserNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/users/me/devices": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "获取当前用户设备列表",
+        "operationId": "listCurrentUserDevices",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "设备列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDevicesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/users/me/devices/revoke": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "注销指定设备",
+        "description": "写接口必须传 clientMutationId。被注销设备的 refresh token 会失效。",
+        "operationId": "revokeUserDevice",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeDeviceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "设备注销成功；重复 clientMutationId 返回首次响应快照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeDeviceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/DeviceNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/cycle/settings": {
+      "get": {
+        "tags": [
+          "cycle"
+        ],
+        "summary": "获取周期设置",
+        "operationId": "getCycleSettings",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "周期设置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CycleSettingsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/cycle/settings/update": {
+      "post": {
+        "tags": [
+          "cycle"
+        ],
+        "summary": "覆盖周期设置",
+        "description": "写接口必须传 clientMutationId。更新后会写入同步日志。",
+        "operationId": "updateCycleSettings",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCycleSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "周期设置更新成功；重复 clientMutationId 返回首次响应快照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CycleSettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/cycle/records": {
+      "get": {
+        "tags": [
+          "cycle"
+        ],
+        "summary": "分页获取经期记录",
+        "description": "当前实现使用 cursor/limit 分页，nextCursor 取自下一条记录的 id。",
+        "operationId": "listPeriodRecords",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CursorQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ListLimitQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "经期记录列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeriodRecordsPageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/cycle/records/create": {
+      "post": {
+        "tags": [
+          "cycle"
+        ],
+        "summary": "新增经期记录",
+        "description": "写接口必须传 clientMutationId。同一用户有效记录日期区间不能重叠。",
+        "operationId": "createPeriodRecord",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePeriodRecordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PeriodRecordOk"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "409": {
+            "$ref": "#/components/responses/CycleRecordOverlapped"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/cycle/records/update": {
+      "post": {
+        "tags": [
+          "cycle"
+        ],
+        "summary": "编辑经期记录",
+        "description": "写接口必须传 clientMutationId。同一用户有效记录日期区间不能重叠。",
+        "operationId": "updatePeriodRecord",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePeriodRecordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PeriodRecordOk"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/CycleRecordNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CycleRecordOverlapped"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/cycle/records/delete": {
+      "post": {
+        "tags": [
+          "cycle"
+        ],
+        "summary": "软删除经期记录",
+        "description": "写接口必须传 clientMutationId。删除后会写入同步日志。",
+        "operationId": "deletePeriodRecord",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeletePeriodRecordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "删除成功；重复 clientMutationId 返回首次响应快照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletePeriodRecordResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/CycleRecordNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/cycle/records/finish": {
+      "post": {
+        "tags": [
+          "cycle"
+        ],
+        "summary": "完成正在进行的经期记录",
+        "description": "写接口必须传 clientMutationId。用于补充 endDate。",
+        "operationId": "finishPeriodRecord",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinishPeriodRecordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PeriodRecordOk"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/CycleRecordNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CycleRecordOverlapped"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/sync/changes": {
+      "get": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "拉取增量同步变更",
+        "operationId": "listSyncChanges",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          },
+          {
+            "name": "afterVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "客户端已处理的最后同步版本"
+          },
+          {
+            "$ref": "#/components/parameters/SyncLimitQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "增量同步变更",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncChangesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/sync/push": {
+      "post": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "批量推送离线变更",
+        "description": "每条变更都必须传 clientMutationId。单条失败不会阻断后续变更，结果会逐条返回。",
+        "operationId": "pushSyncChanges",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncPushRequest"
+              },
+              "example": {
+                "changes": [
+                  {
+                    "clientMutationId": "uuid-from-client",
+                    "entityType": "period_record",
+                    "operation": "create",
+                    "payload": {
+                      "clientRecordId": "local-id",
+                      "startDate": "2026-07-01",
+                      "endDate": "2026-07-04",
+                      "intensity": 2,
+                      "painLevel": 1,
+                      "moods": []
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "批量处理完成；请检查 results 中每条 success/error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPushResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/sync/state": {
+      "get": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "获取服务器同步水位",
+        "operationId": "getSyncState",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "同步水位",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncStateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/backups": {
+      "get": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "获取云端备份快照列表",
+        "description": "当前实现使用 cursor/limit 分页，nextCursor 取自下一条快照的 id。列表只返回元数据，不返回 snapshotCiphertext。",
+        "operationId": "listBackupSnapshots",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CursorQuery"
+          },
+          {
+            "$ref": "#/components/parameters/BackupLimitQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "备份快照列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupSnapshotsPageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/backups/create": {
+      "post": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "创建云端备份快照",
+        "description": "写接口必须传 clientMutationId。同一用户 clientBackupId 不允许重复；当前策略只保留最近 5 条有效快照。",
+        "operationId": "createBackupSnapshot",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBackupSnapshotRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/BackupSnapshotOk"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "409": {
+            "$ref": "#/components/responses/BackupSnapshotConflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/backups/detail": {
+      "get": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "获取备份快照密文详情",
+        "operationId": "getBackupSnapshotDetail",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "备份快照 ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "快照详情，包含 snapshotCiphertext",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupSnapshotDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/BackupSnapshotNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/backups/restore": {
+      "post": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "标记并审计一次备份恢复",
+        "description": "写接口必须传 clientMutationId。该接口只记录恢复审计和同步日志，不直接改写结构化业务表。",
+        "operationId": "restoreBackupSnapshot",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupSnapshotByIdMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "恢复审计已记录；重复 clientMutationId 返回首次响应快照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreBackupSnapshotResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/BackupSnapshotNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/backups/delete": {
+      "post": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "软删除备份快照",
+        "description": "写接口必须传 clientMutationId。删除后列表和详情不再返回该快照。",
+        "operationId": "deleteBackupSnapshot",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupSnapshotByIdMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "删除成功；重复 clientMutationId 返回首次响应快照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteBackupSnapshotResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/BackupSnapshotNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/privacy/config": {
+      "get": {
+        "tags": [
+          "privacy"
+        ],
+        "summary": "获取云端隐私配置",
+        "operationId": "getPrivacyConfig",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "隐私配置；老数据读取时会自动补默认配置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyConfigResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/privacy/config/update": {
+      "post": {
+        "tags": [
+          "privacy"
+        ],
+        "summary": "更新隐私配置",
+        "description": "写接口必须传 clientMutationId。plain 模式必须使用 none 算法；非 plain 模式必须指定真实加密算法；e2ee 模式必须启用 e2eeEnabled。",
+        "operationId": "updatePrivacyConfig",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePrivacyConfigRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "隐私配置更新成功；重复 clientMutationId 返回首次响应快照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyConfigResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/PrivacyConfigNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/privacy/vault-items/save": {
+      "post": {
+        "tags": [
+          "privacy"
+        ],
+        "summary": "保存端到端加密条目",
+        "description": "写接口必须传 clientMutationId。同一用户下 entityType + entityId 唯一；首次保存为 create，后续覆盖为 update。",
+        "operationId": "saveVaultItem",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveVaultItemRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "密文条目保存成功；重复 clientMutationId 返回首次响应快照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/VaultItemNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/privacy/vault-items": {
+      "get": {
+        "tags": [
+          "privacy"
+        ],
+        "summary": "分页拉取端到端加密条目",
+        "description": "当前实现使用 cursor/limit 分页，nextCursor 取自下一条 vault item 的 id；可按 entityType 过滤。",
+        "operationId": "listVaultItems",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CursorQuery"
+          },
+          {
+            "name": "entityType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SyncEntityType"
+            },
+            "description": "被加密实体类型过滤"
+          },
+          {
+            "$ref": "#/components/parameters/ListLimitQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "密文条目列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultItemsPageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "parameters": {
+      "RequestIdHeader": {
+        "name": "x-request-id",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "可选客户端请求 ID；未传时服务端自动生成，并在响应体 requestId 与响应头 x-request-id 中返回。"
+      },
+      "CursorQuery": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "上一页返回的 nextCursor；当前实现为下一条记录 id。"
+      },
+      "ListLimitQuery": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20
+        },
+        "description": "列表页大小。"
+      },
+      "SyncLimitQuery": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 100
+        },
+        "description": "同步变更单次拉取数量。"
+      },
+      "BackupLimitQuery": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "default": 5
+        },
+        "description": "备份列表页大小；当前服务端最多保留最近 5 条有效快照。"
+      }
+    },
+    "responses": {
+      "AuthFailed": {
+        "description": "未登录、token 无效、用户停用、设备不存在或会话已注销",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "BackupSnapshotConflict": {
+        "description": "客户端备份 ID 已存在",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "code": "BACKUP_SNAPSHOT_CONFLICT",
+              "message": "该客户端备份 ID 已存在",
+              "data": {
+                "snapshotId": "uuid"
+              },
+              "requestId": "req_xxx"
+            }
+          }
+        }
+      },
+      "BackupSnapshotNotFound": {
+        "description": "备份快照不存在、已删除或不属于当前用户",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "BackupSnapshotOk": {
+        "description": "备份快照操作成功；重复 clientMutationId 返回首次响应快照",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/BackupSnapshotResponse"
+            }
+          }
+        }
+      },
+      "CycleRecordNotFound": {
+        "description": "经期记录不存在、已删除或不属于当前用户",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "CycleRecordOverlapped": {
+        "description": "经期记录日期区间与已有记录重叠",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "code": "CYCLE_RECORD_OVERLAPPED",
+              "message": "这段日期已存在记录，请换一个区间",
+              "data": {
+                "conflictRecordId": "uuid",
+                "startDate": "2026-05-01",
+                "endDate": "2026-05-05"
+              },
+              "requestId": "req_xxx"
+            }
+          }
+        }
+      },
+      "DeviceNotFound": {
+        "description": "设备不存在或不属于当前用户",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "服务端异常",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "InvalidToken": {
+        "description": "刷新凭证无效或已失效",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "PeriodRecordOk": {
+        "description": "经期记录操作成功；重复 clientMutationId 返回首次响应快照",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/PeriodRecordResponse"
+            }
+          }
+        }
+      },
+      "PrivacyConfigNotFound": {
+        "description": "隐私配置不存在",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "请求过于频繁",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "code": "RATE_LIMITED",
+              "message": "请求过于频繁，请稍后再试",
+              "data": {
+                "retryAfterSeconds": 60
+              },
+              "requestId": "req_xxx"
+            }
+          }
+        }
+      },
+      "UserNotFound": {
+        "description": "用户不存在或已停用",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "ValidationFailed": {
+        "description": "请求参数不符合要求",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "code": "VALIDATION_FAILED",
+              "message": "请求参数不符合要求",
+              "data": {
+                "issues": [
+                  {
+                    "path": "payload.startDate",
+                    "message": "日期格式必须是 YYYY-MM-DD"
+                  }
+                ]
+              },
+              "requestId": "req_xxx"
+            }
+          }
+        }
+      },
+      "VaultItemNotFound": {
+        "description": "端到端加密条目不存在、已删除或不属于当前用户",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "WechatLoginFailed": {
+        "description": "微信登录凭证校验失败或微信服务不可用",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ApiErrorResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "code",
+          "message",
+          "data",
+          "requestId"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "nullable": true,
+            "description": "错误上下文；校验错误时包含 issues，部分业务错误包含资源 ID 或重试秒数。"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiSuccessBase": {
+        "type": "object",
+        "required": [
+          "success",
+          "code",
+          "message",
+          "requestId"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "OK"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "example": "success"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthLoginResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "accessToken",
+                  "refreshToken",
+                  "tokenType",
+                  "expiresIn",
+                  "user",
+                  "device"
+                ],
+                "properties": {
+                  "accessToken": {
+                    "type": "string"
+                  },
+                  "refreshToken": {
+                    "type": "string"
+                  },
+                  "tokenType": {
+                    "type": "string",
+                    "enum": [
+                      "Bearer"
+                    ]
+                  },
+                  "expiresIn": {
+                    "type": "integer",
+                    "example": 7200
+                  },
+                  "user": {
+                    "$ref": "#/components/schemas/PublicUserProfile"
+                  },
+                  "device": {
+                    "$ref": "#/components/schemas/PublicDevice"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "AuthLogoutResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "deviceId",
+                  "revokedAt"
+                ],
+                "properties": {
+                  "deviceId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "revokedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "AuthRefreshResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/TokenPair"
+              }
+            }
+          }
+        ]
+      },
+      "AuthSessionResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "user",
+                  "device"
+                ],
+                "properties": {
+                  "user": {
+                    "$ref": "#/components/schemas/PublicUserProfile"
+                  },
+                  "device": {
+                    "$ref": "#/components/schemas/PublicDevice"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "BackupAlgorithm": {
+        "type": "string",
+        "enum": [
+          "none",
+          "aes-256-gcm",
+          "xchacha20-poly1305"
+        ]
+      },
+      "BackupSnapshot": {
+        "type": "object",
+        "required": [
+          "id",
+          "clientBackupId",
+          "encrypted",
+          "algorithm",
+          "keyVersion",
+          "sizeBytes",
+          "snapshotHash",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clientBackupId": {
+            "type": "string"
+          },
+          "encrypted": {
+            "type": "boolean"
+          },
+          "algorithm": {
+            "$ref": "#/components/schemas/BackupAlgorithm"
+          },
+          "keyVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "snapshotHash": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BackupSnapshotByIdMutationRequest": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "payload": {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        }
+      },
+      "BackupSnapshotDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BackupSnapshot"
+          },
+          {
+            "type": "object",
+            "required": [
+              "snapshotCiphertext"
+            ],
+            "properties": {
+              "snapshotCiphertext": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "BackupSnapshotDetailResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "snapshot"
+                ],
+                "properties": {
+                  "snapshot": {
+                    "$ref": "#/components/schemas/BackupSnapshotDetail"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "BackupSnapshotResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "snapshot"
+                ],
+                "properties": {
+                  "snapshot": {
+                    "$ref": "#/components/schemas/BackupSnapshot"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "BackupSnapshotsPageResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "items",
+                  "nextCursor"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/BackupSnapshot"
+                    }
+                  },
+                  "nextCursor": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ClientMutationId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120,
+        "description": "前端生成的幂等键。同一用户下重复提交同一个 clientMutationId 会返回首次响应快照。"
+      },
+      "CreateBackupSnapshotRequest": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "payload": {
+            "type": "object",
+            "required": [
+              "clientBackupId",
+              "encrypted",
+              "sizeBytes",
+              "snapshotCiphertext",
+              "snapshotHash"
+            ],
+            "properties": {
+              "clientBackupId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "encrypted": {
+                "type": "boolean"
+              },
+              "algorithm": {
+                "$ref": "#/components/schemas/BackupAlgorithm"
+              },
+              "keyVersion": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 1
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 20971520
+              },
+              "snapshotCiphertext": {
+                "type": "string",
+                "minLength": 1
+              },
+              "snapshotHash": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            }
+          }
+        }
+      },
+      "CreatePeriodRecordRequest": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/CreatePeriodRecordPayload"
+          }
+        }
+      },
+      "CreatePeriodRecordPayload": {
+        "type": "object",
+        "required": [
+          "clientRecordId",
+          "startDate",
+          "intensity",
+          "painLevel"
+        ],
+        "properties": {
+          "clientRecordId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "startDate": {
+            "$ref": "#/components/schemas/BusinessDate"
+          },
+          "endDate": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BusinessDate"
+              }
+            ],
+            "nullable": true
+          },
+          "intensity": {
+            "$ref": "#/components/schemas/PeriodIntensity"
+          },
+          "painLevel": {
+            "$ref": "#/components/schemas/PainLevel"
+          },
+          "moods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "default": []
+          },
+          "notesCiphertext": {
+            "type": "string",
+            "minLength": 1,
+            "nullable": true
+          },
+          "clientUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "CycleSettings": {
+        "type": "object",
+        "required": [
+          "userId",
+          "avgCycleLength",
+          "avgPeriodLength",
+          "reminderEnabled",
+          "reminderDaysAhead",
+          "reminderTime",
+          "clientUpdatedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "avgCycleLength": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 100
+          },
+          "avgPeriodLength": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 14
+          },
+          "reminderEnabled": {
+            "type": "boolean"
+          },
+          "reminderDaysAhead": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 14
+          },
+          "reminderTime": {
+            "type": "string",
+            "pattern": "^\\d{2}:\\d{2}$",
+            "example": "09:00"
+          },
+          "clientUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CycleSettingsResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "settings"
+                ],
+                "properties": {
+                  "settings": {
+                    "$ref": "#/components/schemas/CycleSettings"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "DeleteBackupSnapshotResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "snapshotId",
+                  "deletedAt"
+                ],
+                "properties": {
+                  "snapshotId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "deletedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "DeletePeriodRecordRequest": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "payload": {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        }
+      },
+      "DeletePeriodRecordResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "recordId",
+                  "deletedAt"
+                ],
+                "properties": {
+                  "recordId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "deletedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "BACKUP_SNAPSHOT_CONFLICT",
+          "BACKUP_SNAPSHOT_NOT_FOUND",
+          "CYCLE_RECORD_NOT_FOUND",
+          "CYCLE_RECORD_OVERLAPPED",
+          "DEVICE_NOT_FOUND",
+          "IDEMPOTENT_REPLAY",
+          "INTERNAL_SERVER_ERROR",
+          "INVALID_TOKEN",
+          "NOT_IMPLEMENTED",
+          "PRIVACY_CONFIG_NOT_FOUND",
+          "RATE_LIMITED",
+          "SESSION_REVOKED",
+          "UNAUTHORIZED",
+          "USER_NOT_FOUND",
+          "VALIDATION_FAILED",
+          "VAULT_ITEM_NOT_FOUND",
+          "WECHAT_LOGIN_FAILED"
+        ]
+      },
+      "FinishPeriodRecordRequest": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "payload": {
+            "type": "object",
+            "required": [
+              "id",
+              "endDate"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "endDate": {
+                "$ref": "#/components/schemas/BusinessDate"
+              },
+              "clientUpdatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "HealthResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "service",
+                  "status",
+                  "timestamp",
+                  "database",
+                  "modules"
+                ],
+                "properties": {
+                  "service": {
+                    "type": "string",
+                    "example": "moonrise-node-api"
+                  },
+                  "status": {
+                    "type": "string",
+                    "example": "ok"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "database": {
+                    "type": "object",
+                    "required": [
+                      "driver",
+                      "provider",
+                      "configured",
+                      "connected",
+                      "errorMessage"
+                    ],
+                    "properties": {
+                      "driver": {
+                        "type": "string",
+                        "enum": [
+                          "memory",
+                          "postgresql"
+                        ]
+                      },
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "postgresql"
+                        ]
+                      },
+                      "configured": {
+                        "type": "boolean"
+                      },
+                      "connected": {
+                        "type": "boolean",
+                        "nullable": true
+                      },
+                      "errorMessage": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "modules": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "auth",
+                        "users",
+                        "cycle",
+                        "backup",
+                        "privacy",
+                        "sync",
+                        "audit"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "PeriodIntensity": {
+        "type": "integer",
+        "enum": [
+          1,
+          2,
+          3
+        ],
+        "description": "流量：1=少，2=中，3=多。"
+      },
+      "PainLevel": {
+        "type": "integer",
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "description": "痛感：0=无，1=轻，2=中，3=强。"
+      },
+      "BusinessDate": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "example": "2026-07-01",
+        "description": "业务日期，格式 YYYY-MM-DD。"
+      },
+      "PeriodRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "userId",
+          "clientRecordId",
+          "startDate",
+          "endDate",
+          "intensity",
+          "painLevel",
+          "moods",
+          "notesCiphertext",
+          "version",
+          "clientUpdatedAt",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clientRecordId": {
+            "type": "string"
+          },
+          "startDate": {
+            "$ref": "#/components/schemas/BusinessDate"
+          },
+          "endDate": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BusinessDate"
+              }
+            ],
+            "nullable": true
+          },
+          "intensity": {
+            "$ref": "#/components/schemas/PeriodIntensity"
+          },
+          "painLevel": {
+            "$ref": "#/components/schemas/PainLevel"
+          },
+          "moods": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notesCiphertext": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer"
+          },
+          "clientUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "PeriodRecordResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "record"
+                ],
+                "properties": {
+                  "record": {
+                    "$ref": "#/components/schemas/PeriodRecord"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "PeriodRecordsPageResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "items",
+                  "nextCursor"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/PeriodRecord"
+                    }
+                  },
+                  "nextCursor": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "PrivacyAlgorithm": {
+        "type": "string",
+        "enum": [
+          "none",
+          "aes-256-gcm",
+          "xchacha20-poly1305"
+        ]
+      },
+      "PrivacyConfig": {
+        "type": "object",
+        "required": [
+          "userId",
+          "storageMode",
+          "cipherAlgorithm",
+          "keyVersion",
+          "e2eeEnabled",
+          "recoveryEnabled",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "storageMode": {
+            "$ref": "#/components/schemas/PrivacyStorageMode"
+          },
+          "cipherAlgorithm": {
+            "$ref": "#/components/schemas/PrivacyAlgorithm"
+          },
+          "keyVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "e2eeEnabled": {
+            "type": "boolean"
+          },
+          "recoveryEnabled": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PrivacyConfigResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "config"
+                ],
+                "properties": {
+                  "config": {
+                    "$ref": "#/components/schemas/PrivacyConfig"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "PrivacyStorageMode": {
+        "type": "string",
+        "enum": [
+          "plain",
+          "encrypted",
+          "e2ee"
+        ]
+      },
+      "PublicDevice": {
+        "type": "object",
+        "required": [
+          "id",
+          "platform",
+          "deviceName",
+          "lastSeenAt",
+          "revokedAt",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string",
+            "example": "mp-weixin"
+          },
+          "deviceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "revokedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PublicUserProfile": {
+        "type": "object",
+        "required": [
+          "userId",
+          "status",
+          "nickname",
+          "avatarUrl",
+          "gender",
+          "phoneCiphertext",
+          "emailCiphertext",
+          "profileCiphertext",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "disabled",
+              "deleted"
+            ]
+          },
+          "nickname": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "gender": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "phoneCiphertext": {
+            "type": "string",
+            "nullable": true
+          },
+          "emailCiphertext": {
+            "type": "string",
+            "nullable": true
+          },
+          "profileCiphertext": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RefreshTokenRequest": {
+        "type": "object",
+        "required": [
+          "refreshToken"
+        ],
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "RevokeDeviceRequest": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "payload": {
+            "type": "object",
+            "required": [
+              "deviceId"
+            ],
+            "properties": {
+              "deviceId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        }
+      },
+      "RevokeDeviceResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "device"
+                ],
+                "properties": {
+                  "device": {
+                    "$ref": "#/components/schemas/PublicDevice"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "RestoreBackupSnapshotResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "restoredAt",
+                  "snapshot"
+                ],
+                "properties": {
+                  "restoredAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "snapshot": {
+                    "$ref": "#/components/schemas/BackupSnapshot"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SaveVaultItemRequest": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "payload": {
+            "type": "object",
+            "required": [
+              "entityType",
+              "entityId",
+              "algorithm",
+              "keyVersion",
+              "nonce",
+              "ciphertext",
+              "contentHash"
+            ],
+            "properties": {
+              "entityType": {
+                "$ref": "#/components/schemas/SyncEntityType"
+              },
+              "entityId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "algorithm": {
+                "type": "string",
+                "enum": [
+                  "aes-256-gcm",
+                  "xchacha20-poly1305"
+                ]
+              },
+              "keyVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "nonce": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "aad": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000,
+                "nullable": true
+              },
+              "ciphertext": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2097152
+              },
+              "contentHash": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            }
+          }
+        }
+      },
+      "SyncChangeLog": {
+        "type": "object",
+        "required": [
+          "id",
+          "userId",
+          "entityType",
+          "entityId",
+          "operation",
+          "entityVersion",
+          "clientMutationId",
+          "checksum",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entityType": {
+            "$ref": "#/components/schemas/SyncEntityType"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/SyncOperation"
+          },
+          "entityVersion": {
+            "type": "integer",
+            "nullable": true
+          },
+          "clientMutationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "checksum": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SyncChangesResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "items",
+                  "nextVersion"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/SyncChangeLog"
+                    }
+                  },
+                  "nextVersion": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SyncEntityType": {
+        "type": "string",
+        "enum": [
+          "user_profile",
+          "cycle_settings",
+          "period_record",
+          "backup_snapshot",
+          "privacy_config",
+          "vault_item"
+        ]
+      },
+      "SyncOperation": {
+        "type": "string",
+        "enum": [
+          "create",
+          "update",
+          "delete",
+          "restore"
+        ]
+      },
+      "SyncPushRequest": {
+        "type": "object",
+        "required": [
+          "changes"
+        ],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/SyncPushChange"
+            }
+          }
+        }
+      },
+      "SyncPushChange": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "entityType",
+          "operation",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "entityType": {
+            "type": "string",
+            "description": "当前支持 user_profile、cycle_settings、privacy_config、vault_item、period_record。"
+          },
+          "operation": {
+            "type": "string",
+            "description": "当前支持 user_profile.update、cycle_settings.update、privacy_config.update、vault_item.create/update、period_record.create/update/delete/finish。"
+          },
+          "payload": {
+            "type": "object",
+            "description": "对应业务写接口的 payload。"
+          }
+        }
+      },
+      "SyncPushResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "successCount",
+                  "failedCount",
+                  "latestVersion",
+                  "results"
+                ],
+                "properties": {
+                  "successCount": {
+                    "type": "integer"
+                  },
+                  "failedCount": {
+                    "type": "integer"
+                  },
+                  "latestVersion": {
+                    "type": "integer"
+                  },
+                  "results": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/SyncPushSuccessResult"
+                        },
+                        {
+                          "$ref": "#/components/schemas/SyncPushFailedResult"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SyncPushFailedResult": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "entityType",
+          "operation",
+          "success",
+          "error"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "data"
+            ],
+            "properties": {
+              "code": {
+                "$ref": "#/components/schemas/ErrorCode"
+              },
+              "message": {
+                "type": "string"
+              },
+              "data": {
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "SyncPushSuccessResult": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "entityType",
+          "operation",
+          "success",
+          "data"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "description": "对应业务 service 的响应 data，例如 { record }、{ profile } 或 { config }。"
+          }
+        }
+      },
+      "SyncStateResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "latestVersion"
+                ],
+                "properties": {
+                  "latestVersion": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "TokenPair": {
+        "type": "object",
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "tokenType",
+          "expiresIn"
+        ],
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "tokenType": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expiresIn": {
+            "type": "integer",
+            "example": 7200
+          }
+        }
+      },
+      "UpdateCycleSettingsRequest": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "payload": {
+            "type": "object",
+            "required": [
+              "avgCycleLength",
+              "avgPeriodLength",
+              "reminderDaysAhead",
+              "reminderEnabled",
+              "reminderTime"
+            ],
+            "properties": {
+              "avgCycleLength": {
+                "type": "integer",
+                "minimum": 15,
+                "maximum": 100
+              },
+              "avgPeriodLength": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 14
+              },
+              "reminderDaysAhead": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 14
+              },
+              "reminderEnabled": {
+                "type": "boolean"
+              },
+              "reminderTime": {
+                "type": "string",
+                "pattern": "^\\d{2}:\\d{2}$",
+                "example": "08:30"
+              },
+              "clientUpdatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "UpdatePeriodRecordRequest": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "payload": {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "startDate": {
+                "$ref": "#/components/schemas/BusinessDate"
+              },
+              "endDate": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/BusinessDate"
+                  }
+                ],
+                "nullable": true
+              },
+              "intensity": {
+                "$ref": "#/components/schemas/PeriodIntensity"
+              },
+              "painLevel": {
+                "$ref": "#/components/schemas/PainLevel"
+              },
+              "moods": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40
+                }
+              },
+              "notesCiphertext": {
+                "type": "string",
+                "minLength": 1,
+                "nullable": true
+              },
+              "clientUpdatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "UpdatePrivacyConfigRequest": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "payload": {
+            "type": "object",
+            "required": [
+              "storageMode",
+              "cipherAlgorithm",
+              "keyVersion",
+              "e2eeEnabled",
+              "recoveryEnabled"
+            ],
+            "properties": {
+              "storageMode": {
+                "$ref": "#/components/schemas/PrivacyStorageMode"
+              },
+              "cipherAlgorithm": {
+                "$ref": "#/components/schemas/PrivacyAlgorithm"
+              },
+              "keyVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "e2eeEnabled": {
+                "type": "boolean"
+              },
+              "recoveryEnabled": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "UpdateUserProfileRequest": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "avatarUrl": {
+                "type": "string",
+                "format": "uri",
+                "nullable": true
+              },
+              "emailCiphertext": {
+                "type": "string",
+                "minLength": 1,
+                "nullable": true
+              },
+              "gender": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2
+              },
+              "nickname": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "nullable": true
+              },
+              "phoneCiphertext": {
+                "type": "string",
+                "minLength": 1,
+                "nullable": true
+              },
+              "profileCiphertext": {
+                "type": "string",
+                "minLength": 1,
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "UserDevicesResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/PublicDevice"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "UserProfileResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "profile"
+                ],
+                "properties": {
+                  "profile": {
+                    "$ref": "#/components/schemas/PublicUserProfile"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "VaultItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "entityType",
+          "entityId",
+          "algorithm",
+          "keyVersion",
+          "nonce",
+          "aad",
+          "ciphertext",
+          "contentHash",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entityType": {
+            "$ref": "#/components/schemas/SyncEntityType"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "algorithm": {
+            "type": "string",
+            "enum": [
+              "aes-256-gcm",
+              "xchacha20-poly1305"
+            ]
+          },
+          "keyVersion": {
+            "type": "integer"
+          },
+          "nonce": {
+            "type": "string"
+          },
+          "aad": {
+            "type": "string",
+            "nullable": true
+          },
+          "ciphertext": {
+            "type": "string"
+          },
+          "contentHash": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VaultItemResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "item",
+                  "operation"
+                ],
+                "properties": {
+                  "item": {
+                    "$ref": "#/components/schemas/VaultItem"
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "create",
+                      "update"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "VaultItemsPageResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "items",
+                  "nextCursor"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/VaultItem"
+                    }
+                  },
+                  "nextCursor": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "WechatLoginRequest": {
+        "type": "object",
+        "required": [
+          "code",
+          "deviceKey"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "deviceKey": {
+            "type": "string",
+            "minLength": 8
+          },
+          "deviceName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "platform": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "default": "mp-weixin"
+          }
+        }
+      }
+    }
+  }
+}

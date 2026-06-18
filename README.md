@@ -131,6 +131,8 @@ npm run test:postgres
 
 ## API 概览
 
+前端联调可直接导入 `backend_ai_docs/openapi.json` 到 Apifox、Postman 或 Swagger。该文件按当前代码中的路由、DTO 和公开响应结构维护；本节只保留快速入口和核心规则。
+
 所有接口默认前缀为 `/api/v1`。成功响应统一为：
 
 ```json

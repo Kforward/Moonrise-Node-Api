@@ -9,11 +9,12 @@
 2. `01_architecture.md`：Node.js 后端架构、模块边界、推荐技术栈。
 3. `02_business_rules.md`：周期记录、同步、备份、隐私安全的后端业务规则。
 4. `03_api_design.md`：前后端分离 API 草案、响应格式、幂等与分页规则。
-5. `04_database_design.md`：数据库表设计、字段说明、索引与约束。
-6. `05_security_design.md`：数据安全、加密、认证、审计和恢复策略。
-7. `06_ai_dev_rules.md`：迁移到后端项目后给 AI 使用的开发规则。
-8. `07_migration_roadmap.md`：当前仓库改造成正式后端项目的保留、替换、删除和优先级路线。
-9. `database/001_initial_schema.sql`：PostgreSQL 建表草案。
+5. `openapi.json`：当前可用接口的 OpenAPI 3.0.3 契约，可导入 Apifox、Postman 或 Swagger 做前端联调。
+6. `04_database_design.md`：数据库表设计、字段说明、索引与约束。
+7. `05_security_design.md`：数据安全、加密、认证、审计和恢复策略。
+8. `06_ai_dev_rules.md`：迁移到后端项目后给 AI 使用的开发规则。
+9. `07_migration_roadmap.md`：当前仓库改造成正式后端项目的保留、替换、删除和优先级路线。
+10. `database/001_initial_schema.sql`：PostgreSQL 建表草案。
 
 ## 当前设计基准
 
