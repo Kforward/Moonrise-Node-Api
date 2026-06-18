@@ -14,7 +14,8 @@
 7. `05_security_design.md`：数据安全、加密、认证、审计和恢复策略。
 8. `06_ai_dev_rules.md`：迁移到后端项目后给 AI 使用的开发规则。
 9. `07_migration_roadmap.md`：当前仓库改造成正式后端项目的保留、替换、删除和优先级路线。
-10. `database/001_initial_schema.sql`：PostgreSQL 建表草案。
+10. `08_production_deployment.md`：单台云服务器生产部署说明，覆盖 `.env`、PostgreSQL、Nginx、PM2、迁移和发布流程。
+11. `database/001_initial_schema.sql`：PostgreSQL 建表草案。
 
 ## 当前设计基准
 

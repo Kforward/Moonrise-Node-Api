@@ -114,6 +114,8 @@ npm run test:postgres
 生产环境请基于 `.env.production.example` 配置 `moonrise_prod` 和强随机密钥；测试/联调环境请基于 `.env.test.example`
 配置 `moonrise_test`。两个环境分别执行 `npm run db:migrate`。
 
+生产部署到单台云服务器时，可参考 `backend_ai_docs/08_production_deployment.md`。该文档覆盖同机 PostgreSQL、Nginx 反代、PM2、HTTPS、迁移安全说明和日常发布流程。
+
 已建核心表包括：
 
 - `app_users`
@@ -327,6 +329,7 @@ backend_ai_docs/
   05_security_design.md
   06_ai_dev_rules.md
   07_migration_roadmap.md
+  08_production_deployment.md
 ```
 
 ## 文档地图
@@ -340,6 +343,7 @@ backend_ai_docs/
 - `backend_ai_docs/05_security_design.md`：数据安全、认证、审计和恢复策略。
 - `backend_ai_docs/06_ai_dev_rules.md`：AI 开发规范。
 - `backend_ai_docs/07_migration_roadmap.md`：改造路线与当前优先级。
+- `backend_ai_docs/08_production_deployment.md`：单台云服务器生产部署说明。
 - `backend_ai_docs/database/001_initial_schema.sql`：PostgreSQL 建表草案。
 
 ## 下一步优先级
