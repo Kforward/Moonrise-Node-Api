@@ -56,6 +56,10 @@ npm run test:integration # 仅运行集成测试
 npm run test:postgres    # 可选 PostgreSQL 仓储集成测试，需要显式测试库
 ```
 
+## 协作入口
+
+AI Agent 接手本项目时，先阅读 `AGENTS.md`，再阅读 `docs/STATUS.md`、`docs/HANDOFF.md` 和 `docs/AGENT_INDEX.md`。任务相关文档按 `docs/AGENT_INDEX.md` 选择一个 `docs/routes/` 路由文件后再补读，避免默认全量读取仓库。
+
 ## 环境变量
 
 `.env.example` 包含当前支持的配置：
@@ -334,6 +338,16 @@ backend_ai_docs/
 
 ## 文档地图
 
+- `AGENTS.md`：仓库级 AI Agent 协作协议和启动入口。
+- `docs/PROJECT.md`：项目目标、范围、约束和重要假设。
+- `docs/STATUS.md`：当前状态、已完成事项、下一步、风险和验证记录。
+- `docs/HANDOFF.md`：下一位 Agent 的恢复流程和交接说明。
+- `docs/AGENT_INDEX.md`：按任务类型选择 `docs/routes/` 路由文件。
+- `docs/CODE_STANDARDS.md`：实现、测试、安全和提交规范。
+- `docs/ROADMAP.md`：协作视角的当前路线。
+- `docs/DECISIONS.md`：架构、产品和协作流程决策记录。
+- `docs/ai-agent/README.md`：长期稳定的 AI Agent 详细流程。
+- `docs/change-diffs/README.md`：版本、需求、接口和功能差异分析模板。
 - `backend_ai_docs/README.md`：AI 文档入口。
 - `backend_ai_docs/00_backend_prd.md`：后端产品范围和阶段目标。
 - `backend_ai_docs/01_architecture.md`：后端架构、模块边界、推荐技术栈。

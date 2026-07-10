@@ -27,8 +27,8 @@
 
 ## 使用方式
 
-后端 Codex 或其他 AI 进入本项目时，应优先阅读根目录 `README.md`，再阅读本文件、`07_migration_roadmap.md`、`00_backend_prd.md` 和 `06_ai_dev_rules.md`。如果后续拆分独立仓库，可整体复制 `backend_ai_docs/` 作为设计基准。
+后端 Codex 或其他 AI 进入本项目时，应先阅读根目录 `AGENTS.md`、`docs/STATUS.md`、`docs/HANDOFF.md` 和 `docs/AGENT_INDEX.md`，再按任务路由决定是否阅读本文件。进入后端设计上下文后，优先阅读根目录 `README.md`、本文件、`07_migration_roadmap.md`、`00_backend_prd.md` 和 `06_ai_dev_rules.md`。如果后续拆分独立仓库，可整体复制 `backend_ai_docs/` 作为设计基准。
 
 ## Codex 启动优先级
 
-每次 Codex 进入当前仓库时，先阅读 `07_migration_roadmap.md` 判断当前改造阶段和优先事项，再根据具体任务补读产品、架构、数据库、安全和开发规则文档。
+每次 Codex 进入当前仓库时，先遵守根目录 `AGENTS.md` 的协作协议；需要后端设计上下文时，再阅读 `07_migration_roadmap.md` 判断当前改造阶段和优先事项，并根据具体任务补读产品、架构、数据库、安全和开发规则文档。
