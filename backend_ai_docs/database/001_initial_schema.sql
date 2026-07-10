@@ -7,7 +7,7 @@ CREATE TYPE user_status AS ENUM ('active', 'disabled', 'deleted');
 CREATE TYPE auth_provider AS ENUM ('wechat_miniprogram', 'local_dev');
 CREATE TYPE privacy_storage_mode AS ENUM ('plain', 'encrypted', 'e2ee');
 CREATE TYPE privacy_cipher_algorithm AS ENUM ('none', 'aes', 'xchacha20_poly1305');
-CREATE TYPE sync_entity_type AS ENUM ('user_profile', 'cycle_settings', 'period_record', 'backup_snapshot', 'privacy_config', 'vault_item');
+CREATE TYPE sync_entity_type AS ENUM ('user_profile', 'cycle_settings', 'period_record', 'backup_snapshot', 'privacy_config', 'vault_item', 'user_app_preferences');
 CREATE TYPE sync_operation AS ENUM ('create', 'update', 'delete', 'restore');
 
 CREATE TABLE app_users (

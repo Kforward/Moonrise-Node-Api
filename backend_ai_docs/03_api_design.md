@@ -34,7 +34,18 @@
 }
 ```
 
-## 2. 认证接口
+## 2. 应用级接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/app/preferences` | 获取当前用户轻量偏好 |
+| `POST` | `/api/v1/app/preferences/update` | 更新首页提示、空状态引导等轻量偏好 |
+| `GET` | `/api/v1/app/releases` | 分页获取已发布应用更新日志 |
+| `GET` | `/api/v1/app/releases/detail` | 按版本号获取已发布应用更新日志详情 |
+
+`/app/preferences/update` 必须包含 `clientMutationId`，并会写入 `user_app_preferences.update` 同步日志。应用更新日志只返回 `published=true` 的版本，不需要登录态。
+
+## 3. 认证接口
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -45,7 +56,7 @@
 
 `/auth/wechat/login` 在生产环境调用微信 `jscode2session`，用 `openid` 绑定后端账号；开发环境可通过 `WECHAT_LOGIN_MODE=mock` 保留本地联调。微信 `session_key` 只在登录解析阶段使用，不落库、不返回前端。
 
-## 3. 用户资料
+## 4. 用户资料
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -54,14 +65,14 @@
 | `GET` | `/api/v1/users/me/devices` | 获取已绑定设备 |
 | `POST` | `/api/v1/users/me/devices/revoke` | 注销设备 |
 
-## 4. 周期设置
+## 5. 周期设置
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | `GET` | `/api/v1/cycle/settings` | 获取周期设置 |
 | `POST` | `/api/v1/cycle/settings/update` | 覆盖周期设置 |
 
-## 5. 周期记录
+## 6. 周期记录
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -80,7 +91,7 @@
 }
 ```
 
-## 6. 同步接口
+## 7. 同步接口
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -88,7 +99,7 @@
 | `POST` | `/api/v1/sync/push` | 批量推送离线变更 |
 | `GET` | `/api/v1/sync/state` | 获取服务器同步水位 |
 
-`/sync/push` 当前支持批量提交已落地的 `user_profile.update`、`cycle_settings.update`、`privacy_config.update`、`vault_item.create/update` 和 `period_record.create/update/delete/finish`。请求示例：
+`/sync/push` 当前支持批量提交已落地的 `user_profile.update`、`user_app_preferences.update`、`cycle_settings.update`、`privacy_config.update`、`vault_item.create/update` 和 `period_record.create/update/delete/finish`。请求示例：
 
 ```json
 {
@@ -112,7 +123,7 @@
 
 服务端会逐条复用业务接口校验、幂等和同步日志写入；单条失败不会阻断后续变更，响应中的 `results` 会标记每条是否成功，并返回最新同步水位。
 
-## 7. 备份接口
+## 8. 备份接口
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -141,7 +152,7 @@
 
 列表接口只返回元数据，详情接口才返回 `snapshotCiphertext`。服务端第一阶段保留最近 5 条有效快照；创建、恢复、删除都会写入审计日志和同步日志。
 
-## 8. 隐私安全接口
+## 9. 隐私安全接口
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -150,7 +161,7 @@
 | `POST` | `/api/v1/privacy/vault-items/save` | 保存端到端加密条目 |
 | `GET` | `/api/v1/privacy/vault-items` | 拉取端到端加密条目 |
 
-## 9. 分页规则
+## 10. 分页规则
 
 - 列表接口默认 `limit=20`，最大 `limit=100`。
 - 使用游标分页：`cursor` 为上一页最后一条记录的 `createdAt + id` 编码。

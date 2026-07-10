@@ -12,10 +12,11 @@ Moonrise Node API 是面向 Moonrise 小程序/前端应用的后端服务，当
 - `sync`：同步日志、同步水位、增量拉取、`/sync/push` 批量离线变更处理、幂等响应快照。
 - `backup`：云端备份快照创建、列表、详情、恢复审计、软删除、最近 5 条有效快照保留策略。
 - `privacy`：隐私配置读取/切换、密钥版本记录、端到端加密条目密文托管、隐私配置与 vault item 同步日志。
+- `app`：当前用户轻量偏好读取/更新、应用更新日志列表/详情。
 - `audit`：内部审计日志能力，已被登录、设备、备份等流程调用。
-- PostgreSQL/Drizzle：完整 schema 和迁移文件已落地，`auth`、`users`、`cycle`、`sync`、`idempotency`、`backup`、`privacy` 已具备内存/PostgreSQL 双仓储实现。
+- PostgreSQL/Drizzle：完整 schema 和迁移文件已落地，`auth`、`app`、`users`、`cycle`、`sync`、`idempotency`、`backup`、`privacy` 已具备内存/PostgreSQL 双仓储实现。
 
-仍是占位或待扩展能力：
+仍待扩展能力：
 
 - PostgreSQL 集成测试、Redis/多实例限流适配等生产强化能力仍需继续补齐。
 
@@ -132,6 +133,9 @@ npm run test:postgres
 - `idempotency_records`
 - `backup_snapshots`
 - `audit_logs`
+- `user_app_preferences`
+- `app_releases`
+- `app_release_entries`
 - `privacy_configs`
 - `encrypted_vault_items`
 
@@ -163,7 +167,7 @@ npm run test:postgres
 }
 ```
 
-除登录和刷新 token 外，当前业务接口均需要请求头：
+除健康检查、登录、刷新 token 和应用更新日志读取外，当前用户业务接口均需要请求头：
 
 ```http
 Authorization: Bearer <accessToken>
@@ -194,6 +198,13 @@ Content-Type: application/json
 - `POST /auth/refresh`
 - `POST /auth/logout`
 - `GET /auth/session`
+
+应用：
+
+- `GET /app/preferences`
+- `POST /app/preferences/update`
+- `GET /app/releases`
+- `GET /app/releases/detail?version=<version>`
 
 用户：
 
@@ -249,6 +260,7 @@ Content-Type: application/json
 `/sync/push` 当前支持批量提交：
 
 - `user_profile.update`
+- `user_app_preferences.update`
 - `cycle_settings.update`
 - `privacy_config.update`
 - `vault_item.create`
@@ -288,6 +300,8 @@ Content-Type: application/json
 - vault item 密文托管 upsert、幂等和同步日志
 - 备份快照创建、列表、详情、恢复审计、软删除和最近 5 条保留策略
 - PostgreSQL 仓储核心链路、幂等快照和同步日志（需显式运行 `npm run test:postgres`）
+- 应用轻量偏好读取/幂等更新、离线同步推送和同步日志
+- 应用更新日志只返回已发布版本并按条目顺序输出
 
 运行：
 
@@ -314,6 +328,7 @@ src/
     tokens/
     wechat/
   modules/
+    app/
     audit/
     auth/
     backup/

@@ -108,13 +108,48 @@ export interface PrivacyConfigRecord {
   updatedAt: string;
 }
 
+export interface UserAppPreferencesRecord {
+  userId: string;
+  historyEntryHintDismissed: boolean;
+  emptyGuideSkipped: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppReleaseRecord {
+  id: string;
+  version: string;
+  releasedAt: string;
+  title: string;
+  summary: string;
+  published: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppReleaseEntryRecord {
+  id: string;
+  releaseId: string;
+  entryType: string;
+  content: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
 /**
  * 可参与前端增量同步的实体类型。
  *
  * 备份、隐私配置和保险箱实体均通过该枚举接入 `sync_change_logs`，让前端在跨设备
  * 拉取增量时可以使用同一套实体协议。
  */
-export type SyncEntityType = "user_profile" | "cycle_settings" | "period_record" | "backup_snapshot" | "privacy_config" | "vault_item";
+export type SyncEntityType =
+  | "user_profile"
+  | "cycle_settings"
+  | "period_record"
+  | "backup_snapshot"
+  | "privacy_config"
+  | "vault_item"
+  | "user_app_preferences";
 
 export interface EncryptedVaultItemRecord {
   id: string;
@@ -176,6 +211,8 @@ export interface AuditLogRecord {
 }
 
 export interface MemoryStore {
+  appReleaseEntries: Map<string, AppReleaseEntryRecord>;
+  appReleases: Map<string, AppReleaseRecord>;
   auditLogs: AuditLogRecord[];
   authIdentities: Map<string, AuthIdentityRecord>;
   backupSnapshots: Map<string, BackupSnapshotRecord>;
@@ -189,10 +226,13 @@ export interface MemoryStore {
   privacyConfigs: Map<string, PrivacyConfigRecord>;
   profiles: Map<string, UserProfileRecord>;
   syncChangeLogs: SyncChangeLogRecord[];
+  userAppPreferences: Map<string, UserAppPreferencesRecord>;
   users: Map<string, AppUserRecord>;
 }
 
 export const memoryStore: MemoryStore = {
+  appReleaseEntries: new Map(),
+  appReleases: new Map(),
   auditLogs: [],
   authIdentities: new Map(),
   backupSnapshots: new Map(),
@@ -206,6 +246,7 @@ export const memoryStore: MemoryStore = {
   privacyConfigs: new Map(),
   profiles: new Map(),
   syncChangeLogs: [],
+  userAppPreferences: new Map(),
   users: new Map(),
 };
 
@@ -216,6 +257,8 @@ export const memoryStore: MemoryStore = {
  * 幂等快照和同步日志在用例之间相互污染。运行中的业务代码不应在请求处理中调用它。
  */
 export function resetMemoryStore(): void {
+  memoryStore.appReleaseEntries.clear();
+  memoryStore.appReleases.clear();
   memoryStore.auditLogs.length = 0;
   memoryStore.authIdentities.clear();
   memoryStore.backupSnapshots.clear();
@@ -229,6 +272,7 @@ export function resetMemoryStore(): void {
   memoryStore.privacyConfigs.clear();
   memoryStore.profiles.clear();
   memoryStore.syncChangeLogs.length = 0;
+  memoryStore.userAppPreferences.clear();
   memoryStore.users.clear();
 }
 
@@ -277,6 +321,13 @@ export function createDefaultUserBundle(): AppUserRecord {
     keyVersion: 1,
     recoveryEnabled: false,
     storageMode: "plain",
+    updatedAt: timestamp,
+    userId: user.id,
+  });
+  memoryStore.userAppPreferences.set(user.id, {
+    createdAt: timestamp,
+    emptyGuideSkipped: false,
+    historyEntryHintDismissed: false,
     updatedAt: timestamp,
     userId: user.id,
   });

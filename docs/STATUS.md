@@ -6,9 +6,10 @@
 
 ## 已完成
 - Fastify + TypeScript 后端骨架、统一响应、统一错误、请求 ID、健康检查和模块路由。
-- `auth`、`users`、`cycle`、`sync`、`backup`、`privacy`、`audit` 主链路接口。
+- `auth`、`app`、`users`、`cycle`、`sync`、`backup`、`privacy`、`audit` 主链路接口。
 - PostgreSQL/Drizzle schema、迁移文件、内存/PostgreSQL 双仓储实现。
 - 幂等响应快照、同步日志、备份保留策略、隐私配置和 vault item 密文托管。
+- 应用轻量偏好读取/幂等更新、应用更新日志列表/详情，偏好更新已接入 `user_app_preferences.update` 同步日志和 `/sync/push`。
 - `backend_ai_docs/` 中产品、架构、业务规则、API、数据库、安全、路线和部署文档。
 - 新增多 Agent 协作文档入口、状态、交接、路由、代码规范、决策记录和变更差异目录。
 
@@ -28,4 +29,4 @@
 - 多实例部署后，进程内限流无法保证全局限流效果。
 
 ## 最近验证
-- `npm test`：通过，包含 `tsc --noEmit` 和 11 个默认集成测试。
+- `npm test`：通过，包含 `tsc --noEmit` 和 13 个默认集成测试。

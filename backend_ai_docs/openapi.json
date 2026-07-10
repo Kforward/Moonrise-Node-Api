@@ -17,6 +17,10 @@
       "description": "服务健康检查"
     },
     {
+      "name": "app",
+      "description": "应用级元数据与轻量用户偏好"
+    },
+    {
       "name": "auth",
       "description": "微信登录、token 刷新和设备会话"
     },
@@ -64,6 +68,184 @@
                 }
               }
             }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/app/preferences": {
+      "get": {
+        "tags": [
+          "app"
+        ],
+        "summary": "获取当前用户轻量偏好",
+        "operationId": "getAppPreferences",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前用户轻量偏好",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppPreferencesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/app/preferences/update": {
+      "post": {
+        "tags": [
+          "app"
+        ],
+        "summary": "更新当前用户轻量偏好",
+        "description": "支持 clientMutationId 幂等；成功后写入 user_app_preferences.update 同步日志。",
+        "operationId": "updateAppPreferences",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAppPreferencesRequest"
+              },
+              "example": {
+                "clientMutationId": "uuid-from-client",
+                "payload": {
+                  "historyEntryHintDismissed": true,
+                  "emptyGuideSkipped": false
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "偏好更新成功；重复 clientMutationId 返回首次响应快照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppPreferencesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/app/releases": {
+      "get": {
+        "tags": [
+          "app"
+        ],
+        "summary": "分页获取已发布应用更新日志",
+        "operationId": "listAppReleases",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CursorQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ListLimitQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "已发布更新日志列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppReleasesPageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/app/releases/detail": {
+      "get": {
+        "tags": [
+          "app"
+        ],
+        "summary": "按版本号获取应用更新日志详情",
+        "operationId": "getAppReleaseDetail",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestIdHeader"
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "指定版本更新日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppReleaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/AppReleaseNotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
@@ -1454,6 +1636,16 @@
       }
     },
     "responses": {
+      "AppReleaseNotFound": {
+        "description": "应用更新日志不存在或尚未发布",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
       "AuthFailed": {
         "description": "未登录、token 无效、用户停用、设备不存在或会话已注销",
         "content": {
@@ -1719,6 +1911,200 @@
             "type": "string"
           }
         }
+      },
+      "AppPreferences": {
+        "type": "object",
+        "required": [
+          "userId",
+          "historyEntryHintDismissed",
+          "emptyGuideSkipped",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "historyEntryHintDismissed": {
+            "type": "boolean",
+            "description": "是否关闭历史补录提示"
+          },
+          "emptyGuideSkipped": {
+            "type": "boolean",
+            "description": "是否跳过首页空数据引导"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AppPreferencesResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "preferences"
+                ],
+                "properties": {
+                  "preferences": {
+                    "$ref": "#/components/schemas/AppPreferences"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "AppReleaseEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "entryType",
+          "content",
+          "sortOrder"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "entryType": {
+            "type": "string",
+            "enum": [
+              "feature",
+              "improvement",
+              "fix",
+              "security"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer"
+          }
+        }
+      },
+      "AppRelease": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "releasedAt",
+          "title",
+          "summary",
+          "entries",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "releasedAt": {
+            "type": "string",
+            "format": "date"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppReleaseEntry"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AppReleasesPageResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "items",
+                  "nextCursor"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/AppRelease"
+                    }
+                  },
+                  "nextCursor": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "AppReleaseResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiSuccessBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "release"
+                ],
+                "properties": {
+                  "release": {
+                    "$ref": "#/components/schemas/AppRelease"
+                  }
+                }
+              }
+            }
+          }
+        ]
       },
       "AuthLoginResponse": {
         "allOf": [
@@ -2039,6 +2425,32 @@
         "maxLength": 120,
         "description": "前端生成的幂等键。同一用户下重复提交同一个 clientMutationId 会返回首次响应快照。"
       },
+      "UpdateAppPreferencesRequest": {
+        "type": "object",
+        "required": [
+          "clientMutationId",
+          "payload"
+        ],
+        "properties": {
+          "clientMutationId": {
+            "$ref": "#/components/schemas/ClientMutationId"
+          },
+          "payload": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+              "historyEntryHintDismissed": {
+                "type": "boolean",
+                "description": "是否关闭历史补录提示"
+              },
+              "emptyGuideSkipped": {
+                "type": "boolean",
+                "description": "是否跳过首页空数据引导"
+              }
+            }
+          }
+        }
+      },
       "CreateBackupSnapshotRequest": {
         "type": "object",
         "required": [
@@ -2335,6 +2747,7 @@
       "ErrorCode": {
         "type": "string",
         "enum": [
+          "APP_RELEASE_NOT_FOUND",
           "BACKUP_SNAPSHOT_CONFLICT",
           "BACKUP_SNAPSHOT_NOT_FOUND",
           "CYCLE_RECORD_NOT_FOUND",
@@ -3076,7 +3489,8 @@
           "period_record",
           "backup_snapshot",
           "privacy_config",
-          "vault_item"
+          "vault_item",
+          "user_app_preferences"
         ]
       },
       "SyncOperation": {
@@ -3118,11 +3532,11 @@
           },
           "entityType": {
             "type": "string",
-            "description": "当前支持 user_profile、cycle_settings、privacy_config、vault_item、period_record。"
+            "description": "当前支持 user_profile、user_app_preferences、cycle_settings、privacy_config、vault_item、period_record。"
           },
           "operation": {
             "type": "string",
-            "description": "当前支持 user_profile.update、cycle_settings.update、privacy_config.update、vault_item.create/update、period_record.create/update/delete/finish。"
+            "description": "当前支持 user_profile.update、user_app_preferences.update、cycle_settings.update、privacy_config.update、vault_item.create/update、period_record.create/update/delete/finish。"
           },
           "payload": {
             "type": "object",

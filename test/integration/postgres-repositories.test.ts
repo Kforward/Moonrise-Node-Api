@@ -36,6 +36,13 @@ interface SyncChangesData {
   nextVersion: number;
 }
 
+interface AppPreferencesData {
+  preferences: {
+    historyEntryHintDismissed: boolean;
+    emptyGuideSkipped: boolean;
+  };
+}
+
 interface BackupSnapshotData {
   snapshot: {
     id: string;
@@ -57,6 +64,22 @@ postgresTest("PostgreSQL 仓储支持核心业务链路、幂等快照和同步�
 
   const app = await createPostgresTestApp(context);
   const login = await loginWithMockWechat(app, "postgres-core-flow");
+
+  const preferencesResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/app/preferences/update",
+    ...authJsonRequest(login.accessToken, {
+      clientMutationId: "pg-app-preferences-update",
+      payload: {
+        emptyGuideSkipped: true,
+        historyEntryHintDismissed: true,
+      },
+    }),
+  });
+  const preferencesBody = parseApiResponse<AppPreferencesData>(preferencesResponse);
+
+  assert.equal(preferencesResponse.statusCode, 200);
+  assert.equal(preferencesBody.data.preferences.emptyGuideSkipped, true);
 
   const profileResponse = await app.inject({
     method: "POST",
@@ -183,6 +206,7 @@ postgresTest("PostgreSQL 仓储支持核心业务链路、幂等快照和同步�
   assert.deepEqual(
     changesBody.data.items.map(item => `${item.entityType}.${item.operation}`),
     [
+      "user_app_preferences.update",
       "user_profile.update",
       "period_record.create",
       "backup_snapshot.create",
@@ -193,6 +217,7 @@ postgresTest("PostgreSQL 仓储支持核心业务链路、幂等快照和同步�
   assert.deepEqual(
     changesBody.data.items.map(item => item.clientMutationId),
     [
+      "pg-app-preferences-update",
       "pg-profile-update",
       "pg-period-create",
       "pg-backup-create",

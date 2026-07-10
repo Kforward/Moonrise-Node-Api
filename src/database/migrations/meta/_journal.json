@@ -15,6 +15,13 @@
       "when": 1779696492904,
       "tag": "0001_parallel_bromley",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783641600000,
+      "tag": "0002_add_user_app_preferences_sync_entity",
+      "breakpoints": true
     }
   ]
 }

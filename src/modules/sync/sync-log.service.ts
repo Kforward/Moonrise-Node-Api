@@ -5,6 +5,8 @@ import { validateWithZod } from "../../common/validators/validate-with-zod";
 import { nowIso } from "../../common/utils/date-time";
 import { sha256 } from "../../common/utils/hash";
 import type { SyncChangeLogRecord, SyncEntityType, SyncOperation } from "../../infrastructure/database/memory-store";
+import { updateAppPreferencesSchema } from "../app/app.dto";
+import { updateCurrentAppPreferences } from "../app/app.service";
 import { requireActiveSession } from "../auth/auth.service";
 import {
   createPeriodRecordSchema,
@@ -210,6 +212,10 @@ async function applySyncPushChange(
 async function dispatchSyncPushChange(currentSession: CurrentSession, change: SyncPushChangeInput): Promise<unknown> {
   if (change.entityType === "user_profile" && change.operation === "update") {
     return updateCurrentUserProfile(currentSession, validateWithZod(updateUserProfileSchema, buildMutationInput(change)));
+  }
+
+  if (change.entityType === "user_app_preferences" && change.operation === "update") {
+    return updateCurrentAppPreferences(currentSession, validateWithZod(updateAppPreferencesSchema, buildMutationInput(change)));
   }
 
   if (change.entityType === "cycle_settings" && change.operation === "update") {

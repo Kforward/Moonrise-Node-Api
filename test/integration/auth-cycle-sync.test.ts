@@ -36,6 +36,39 @@ interface RefreshData {
   tokenType: "Bearer";
 }
 
+interface AppPreferencesData {
+  preferences: {
+    userId: string;
+    historyEntryHintDismissed: boolean;
+    emptyGuideSkipped: boolean;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
+interface AppReleaseData {
+  id: string;
+  version: string;
+  releasedAt: string;
+  title: string;
+  summary: string;
+  entries: Array<{
+    id: string;
+    entryType: string;
+    content: string;
+    sortOrder: number;
+  }>;
+}
+
+interface AppReleasesPageData {
+  items: AppReleaseData[];
+  nextCursor: string | null;
+}
+
+interface AppReleaseDetailData {
+  release: AppReleaseData;
+}
+
 interface ProfileData {
   profile: {
     userId: string;
@@ -373,6 +406,193 @@ test("微信登录后 refresh token 会轮换并废弃旧 token", async context 
 
   assert.equal(oldTokenResponse.statusCode, 401);
   assert.equal(oldTokenBody.code, "INVALID_TOKEN");
+});
+
+test("应用轻量偏好支持读取、幂等更新和离线同步推送", async context => {
+  const app = await createMemoryTestApp(context);
+  const login = await loginWithMockWechat(app, "test-app-preferences");
+  const defaultResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/app/preferences",
+  });
+  const defaultBody = parseApiResponse<AppPreferencesData>(defaultResponse);
+
+  assert.equal(defaultResponse.statusCode, 200);
+  assert.equal(defaultBody.data.preferences.historyEntryHintDismissed, false);
+  assert.equal(defaultBody.data.preferences.emptyGuideSkipped, false);
+
+  const firstUpdateResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/app/preferences/update",
+    ...authJsonRequest(login.accessToken, {
+      clientMutationId: "app-preferences-update-idempotent",
+      payload: {
+        historyEntryHintDismissed: true,
+      },
+    }),
+  });
+  const duplicateUpdateResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/app/preferences/update",
+    ...authJsonRequest(login.accessToken, {
+      clientMutationId: "app-preferences-update-idempotent",
+      payload: {
+        emptyGuideSkipped: true,
+        historyEntryHintDismissed: false,
+      },
+    }),
+  });
+  const firstUpdateBody = parseApiResponse<AppPreferencesData>(firstUpdateResponse);
+  const duplicateUpdateBody = parseApiResponse<AppPreferencesData>(duplicateUpdateResponse);
+
+  assert.equal(firstUpdateResponse.statusCode, 200);
+  assert.equal(duplicateUpdateResponse.statusCode, 200);
+  assert.equal(firstUpdateBody.data.preferences.historyEntryHintDismissed, true);
+  assert.equal(firstUpdateBody.data.preferences.emptyGuideSkipped, false);
+  assert.deepEqual(duplicateUpdateBody.data.preferences, firstUpdateBody.data.preferences);
+
+  const pushResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/sync/push",
+    ...authJsonRequest(login.accessToken, {
+      changes: [
+        {
+          clientMutationId: "push-app-preferences-update",
+          entityType: "user_app_preferences",
+          operation: "update",
+          payload: {
+            emptyGuideSkipped: true,
+          },
+        },
+      ],
+    }),
+  });
+  const pushBody = parseApiResponse<SyncPushData>(pushResponse);
+
+  assert.equal(pushResponse.statusCode, 200);
+  assert.equal(pushBody.data.successCount, 1);
+  assert.equal(pushBody.data.failedCount, 0);
+  assert.equal(pushBody.data.results[0]?.entityType, "user_app_preferences");
+  assert.equal(pushBody.data.results[0]?.operation, "update");
+
+  const latestPreferencesResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/app/preferences",
+  });
+  const latestPreferencesBody = parseApiResponse<AppPreferencesData>(latestPreferencesResponse);
+
+  assert.equal(latestPreferencesResponse.statusCode, 200);
+  assert.equal(latestPreferencesBody.data.preferences.historyEntryHintDismissed, true);
+  assert.equal(latestPreferencesBody.data.preferences.emptyGuideSkipped, true);
+
+  const syncResponse = await app.inject({
+    headers: authHeaders(login.accessToken),
+    method: "GET",
+    url: "/api/v1/sync/changes?afterVersion=0&limit=20",
+  });
+  const syncBody = parseApiResponse<SyncChangesData>(syncResponse);
+  const preferencesChanges = syncBody.data.items.filter(item => item.entityType === "user_app_preferences");
+
+  assert.deepEqual(
+    preferencesChanges.map(change => change.clientMutationId),
+    ["app-preferences-update-idempotent", "push-app-preferences-update"],
+  );
+  assert.deepEqual(
+    preferencesChanges.map(change => change.operation),
+    ["update", "update"],
+  );
+});
+
+test("应用更新日志只返回已发布版本并按条目顺序输出", async context => {
+  const app = await createMemoryTestApp(context);
+  const { memoryStore } = await import("../../src/infrastructure/database/memory-store");
+  const releaseOneId = "11111111-1111-4111-8111-111111111111";
+  const releaseTwoId = "22222222-2222-4222-8222-222222222222";
+  const unpublishedReleaseId = "33333333-3333-4333-8333-333333333333";
+
+  memoryStore.appReleases.set(releaseOneId, {
+    createdAt: "2026-07-01T00:00:00.000Z",
+    id: releaseOneId,
+    published: true,
+    releasedAt: "2026-07-01",
+    summary: "第一个公开版本",
+    title: "Moonrise 1.0",
+    updatedAt: "2026-07-01T00:00:00.000Z",
+    version: "1.0.0",
+  });
+  memoryStore.appReleases.set(releaseTwoId, {
+    createdAt: "2026-07-10T00:00:00.000Z",
+    id: releaseTwoId,
+    published: true,
+    releasedAt: "2026-07-10",
+    summary: "第二个公开版本",
+    title: "Moonrise 1.1",
+    updatedAt: "2026-07-10T00:00:00.000Z",
+    version: "1.1.0",
+  });
+  memoryStore.appReleases.set(unpublishedReleaseId, {
+    createdAt: "2026-07-11T00:00:00.000Z",
+    id: unpublishedReleaseId,
+    published: false,
+    releasedAt: "2026-07-11",
+    summary: "未发布版本",
+    title: "Moonrise Draft",
+    updatedAt: "2026-07-11T00:00:00.000Z",
+    version: "2.0.0",
+  });
+  memoryStore.appReleaseEntries.set("entry-release-two-fix", {
+    content: "修复同步提示文案",
+    createdAt: "2026-07-10T00:00:00.000Z",
+    entryType: "fix",
+    id: "entry-release-two-fix",
+    releaseId: releaseTwoId,
+    sortOrder: 2,
+  });
+  memoryStore.appReleaseEntries.set("entry-release-two-feature", {
+    content: "新增云端备份入口",
+    createdAt: "2026-07-10T00:00:00.000Z",
+    entryType: "feature",
+    id: "entry-release-two-feature",
+    releaseId: releaseTwoId,
+    sortOrder: 1,
+  });
+
+  const listResponse = await app.inject({
+    method: "GET",
+    url: "/api/v1/app/releases?limit=10",
+  });
+  const listBody = parseApiResponse<AppReleasesPageData>(listResponse);
+
+  assert.equal(listResponse.statusCode, 200);
+  assert.deepEqual(
+    listBody.data.items.map(item => item.version),
+    ["1.1.0", "1.0.0"],
+  );
+  assert.deepEqual(
+    listBody.data.items[0]?.entries.map(entry => entry.content),
+    ["新增云端备份入口", "修复同步提示文案"],
+  );
+
+  const detailResponse = await app.inject({
+    method: "GET",
+    url: "/api/v1/app/releases/detail?version=1.1.0",
+  });
+  const detailBody = parseApiResponse<AppReleaseDetailData>(detailResponse);
+
+  assert.equal(detailResponse.statusCode, 200);
+  assert.equal(detailBody.data.release.title, "Moonrise 1.1");
+  assert.equal(detailBody.data.release.entries.length, 2);
+
+  const unpublishedResponse = await app.inject({
+    method: "GET",
+    url: "/api/v1/app/releases/detail?version=2.0.0",
+  });
+  const unpublishedBody = parseApiResponse<null>(unpublishedResponse);
+
+  assert.equal(unpublishedResponse.statusCode, 404);
+  assert.equal(unpublishedBody.code, "APP_RELEASE_NOT_FOUND");
 });
 
 test("重复资料更新会返回首次响应并只写入一条同步日志", async context => {

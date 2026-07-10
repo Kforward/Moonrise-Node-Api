@@ -1,4 +1,5 @@
 export const BACKEND_MODULES = [
+  "app",
   "auth",
   "users",
   "cycle",

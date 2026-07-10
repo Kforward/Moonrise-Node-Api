@@ -54,6 +54,7 @@ export const syncEntityTypeEnum = pgEnum("sync_entity_type", [
   "backup_snapshot",
   "privacy_config",
   "vault_item",
+  "user_app_preferences",
 ]);
 
 /**

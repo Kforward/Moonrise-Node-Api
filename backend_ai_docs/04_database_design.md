@@ -13,7 +13,7 @@
 - JSONB 只用于边界灵活但不作为主要关联条件的数据，例如心情标签数组、非敏感审计元数据、端到端加密附加信息。
 - 对需要查询、筛选、唯一约束或关联的数据，不使用 JSONB 逃避范式设计。
 - 快照表允许保存完整密文快照，因为它服务灾备恢复，不替代结构化业务表。
-- 可选更新日志如需服务端维护，应进一步拆成 `app_releases` 与 `app_release_entries`；当前 SQL 草案中的 `entries jsonb` 仅作为低频展示配置的简化方案，若需要后台管理和筛选，必须拆表。
+- 更新日志由 `app_releases` 与 `app_release_entries` 拆表维护；如果后续需要后台管理、筛选或灰度发布，应继续沿用拆表结构，不回退为单表 JSONB。
 
 ## 2. 核心表概览
 
@@ -32,8 +32,8 @@
 | `sync_change_logs` | 增量同步变更日志 |
 | `idempotency_records` | 写接口幂等响应快照 |
 | `audit_logs` | 安全与恢复审计日志 |
-| `app_releases` | 可选的应用更新日志 |
-| `app_release_entries` | 可选的更新日志条目明细 |
+| `app_releases` | 应用更新日志 |
+| `app_release_entries` | 更新日志条目明细 |
 
 ## 3. 实体关系
 
@@ -140,6 +140,8 @@ erDiagram
 | `history_entry_hint_dismissed` | `boolean` | 是否关闭历史补录提示 |
 | `empty_guide_skipped` | `boolean` | 是否跳过首页空数据引导 |
 
+当前已开放 `/api/v1/app/preferences` 和 `/api/v1/app/preferences/update`。偏好更新会写入 `sync_change_logs`，实体类型为 `user_app_preferences`。
+
 ### 4.8 `privacy_configs`
 
 隐私配置表。只记录配置与密钥版本，不保存明文密钥。
@@ -221,7 +223,7 @@ erDiagram
 
 ### 4.14 `app_releases` 与 `app_release_entries`
 
-可选更新日志表。如果后续希望后端动态下发更新日志，可从当前前端静态 `src/utils/changelog.ts` 迁移。
+应用更新日志表，用于后端动态下发已发布版本说明。当前已开放 `/api/v1/app/releases` 和 `/api/v1/app/releases/detail` 只读接口，只返回 `published=true` 的版本。
 
 `app_releases` 保存版本主信息：
 
