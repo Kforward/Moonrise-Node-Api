@@ -72,6 +72,7 @@ export const privacyStorageModeEnum = pgEnum("privacy_storage_mode", ["plain", "
  */
 export const privacyCipherAlgorithmEnum = pgEnum("privacy_cipher_algorithm", [
   "none",
+  "aes-256-cbc-hmac-sha256",
   "aes-256-gcm",
   "xchacha20-poly1305",
 ]);

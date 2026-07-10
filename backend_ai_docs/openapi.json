@@ -2240,6 +2240,7 @@
         "type": "string",
         "enum": [
           "none",
+          "aes-256-cbc-hmac-sha256",
           "aes-256-gcm",
           "xchacha20-poly1305"
         ]
@@ -3059,6 +3060,7 @@
         "type": "string",
         "enum": [
           "none",
+          "aes-256-cbc-hmac-sha256",
           "aes-256-gcm",
           "xchacha20-poly1305"
         ]
@@ -3367,6 +3369,7 @@
               "algorithm": {
                 "type": "string",
                 "enum": [
+                  "aes-256-cbc-hmac-sha256",
                   "aes-256-gcm",
                   "xchacha20-poly1305"
                 ]
@@ -4005,6 +4008,7 @@
           "algorithm": {
             "type": "string",
             "enum": [
+              "aes-256-cbc-hmac-sha256",
               "aes-256-gcm",
               "xchacha20-poly1305"
             ]

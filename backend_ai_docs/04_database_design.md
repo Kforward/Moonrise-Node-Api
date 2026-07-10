@@ -244,6 +244,10 @@ erDiagram
 | `content` | `text` | 条目内容 |
 | `sort_order` | `integer` | 展示排序 |
 
+### 4.15 加密算法枚举
+
+`privacy_cipher_algorithm` 当前允许 `none`、`aes-256-cbc-hmac-sha256`、`aes-256-gcm` 和 `xchacha20-poly1305`。其中 `aes-256-cbc-hmac-sha256` 用于兼容当前小程序端 CryptoJS 能力的客户端密文信封，服务端只存储算法名、密钥版本、密文和摘要，不解密快照或 vault 正文。
+
 ## 5. 索引与约束
 
 - `auth_identities(provider, provider_subject)` 唯一。

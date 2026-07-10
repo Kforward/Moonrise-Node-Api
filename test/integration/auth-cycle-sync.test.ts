@@ -912,7 +912,7 @@ test("隐私配置支持读取、切换、幂等、同步日志和审计", async
     ...authJsonRequest(login.accessToken, {
       clientMutationId: "privacy-config-update-idempotent",
       payload: {
-        cipherAlgorithm: "aes-256-gcm",
+        cipherAlgorithm: "aes-256-cbc-hmac-sha256",
         e2eeEnabled: true,
         keyVersion: 2,
         recoveryEnabled: true,
@@ -1069,6 +1069,7 @@ test("备份快照支持创建、详情、恢复审计和软删除", async conte
 
   assert.equal(createResponse.statusCode, 200);
   assert.equal(duplicateResponse.statusCode, 200);
+  assert.equal(createBody.data.snapshot.algorithm, "aes-256-cbc-hmac-sha256");
   assert.equal(duplicateBody.data.snapshot.id, createBody.data.snapshot.id);
   assert.equal(duplicateBody.data.snapshot.clientBackupId, "backup-client-001");
 
@@ -1091,7 +1092,29 @@ test("备份快照支持创建、详情、恢复审计和软删除", async conte
   const detailBody = parseApiResponse<BackupSnapshotDetailData>(detailResponse);
 
   assert.equal(detailResponse.statusCode, 200);
+  assert.equal(detailBody.data.snapshot.algorithm, "aes-256-cbc-hmac-sha256");
   assert.equal(detailBody.data.snapshot.snapshotCiphertext, "ciphertext-001");
+
+  const invalidPlainResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/backups/create",
+    ...authJsonRequest(login.accessToken, {
+      clientMutationId: "backup-invalid-plain-algorithm",
+      payload: {
+        algorithm: "aes-256-cbc-hmac-sha256",
+        clientBackupId: "backup-invalid-plain",
+        encrypted: false,
+        keyVersion: 1,
+        sizeBytes: 16,
+        snapshotCiphertext: "plain-snapshot-body",
+        snapshotHash: "plain-hash",
+      },
+    }),
+  });
+  const invalidPlainBody = parseApiResponse<null>(invalidPlainResponse);
+
+  assert.equal(invalidPlainResponse.statusCode, 400);
+  assert.equal(invalidPlainBody.code, "VALIDATION_FAILED");
 
   const restoreResponse = await app.inject({
     method: "POST",
@@ -1200,7 +1223,7 @@ function createBackupSnapshotViaApi(
     ...authJsonRequest(accessToken, {
       clientMutationId: input.clientMutationId,
       payload: {
-        algorithm: "aes-256-gcm",
+        algorithm: "aes-256-cbc-hmac-sha256",
         clientBackupId: input.clientBackupId,
         encrypted: true,
         keyVersion: 1,

@@ -6,7 +6,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TYPE user_status AS ENUM ('active', 'disabled', 'deleted');
 CREATE TYPE auth_provider AS ENUM ('wechat_miniprogram', 'local_dev');
 CREATE TYPE privacy_storage_mode AS ENUM ('plain', 'encrypted', 'e2ee');
-CREATE TYPE privacy_cipher_algorithm AS ENUM ('none', 'aes', 'xchacha20_poly1305');
+CREATE TYPE privacy_cipher_algorithm AS ENUM ('none', 'aes-256-cbc-hmac-sha256', 'aes-256-gcm', 'xchacha20-poly1305');
 CREATE TYPE sync_entity_type AS ENUM ('user_profile', 'cycle_settings', 'period_record', 'backup_snapshot', 'privacy_config', 'vault_item', 'user_app_preferences');
 CREATE TYPE sync_operation AS ENUM ('create', 'update', 'delete', 'restore');
 
@@ -103,7 +103,7 @@ CREATE TABLE user_app_preferences (
 CREATE TABLE privacy_configs (
   user_id uuid PRIMARY KEY REFERENCES app_users(id),
   storage_mode privacy_storage_mode NOT NULL DEFAULT 'encrypted',
-  cipher_algorithm privacy_cipher_algorithm NOT NULL DEFAULT 'aes',
+  cipher_algorithm privacy_cipher_algorithm NOT NULL DEFAULT 'aes-256-cbc-hmac-sha256',
   key_version integer NOT NULL DEFAULT 1,
   e2ee_enabled boolean NOT NULL DEFAULT false,
   recovery_enabled boolean NOT NULL DEFAULT false,
@@ -133,7 +133,7 @@ CREATE TABLE backup_snapshots (
   user_id uuid NOT NULL REFERENCES app_users(id),
   client_backup_id varchar(80) NOT NULL,
   encrypted boolean NOT NULL DEFAULT true,
-  algorithm privacy_cipher_algorithm NOT NULL DEFAULT 'aes',
+  algorithm privacy_cipher_algorithm NOT NULL DEFAULT 'aes-256-cbc-hmac-sha256',
   key_version integer NOT NULL DEFAULT 1,
   size_bytes integer NOT NULL DEFAULT 0,
   snapshot_ciphertext text NOT NULL,

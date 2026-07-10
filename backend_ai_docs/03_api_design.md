@@ -141,7 +141,7 @@
   "payload": {
     "clientBackupId": "local-backup-id",
     "encrypted": true,
-    "algorithm": "aes-256-gcm",
+    "algorithm": "aes-256-cbc-hmac-sha256",
     "keyVersion": 1,
     "sizeBytes": 1024,
     "snapshotCiphertext": "encrypted-payload",
@@ -151,6 +151,8 @@
 ```
 
 列表接口只返回元数据，详情接口才返回 `snapshotCiphertext`。服务端第一阶段保留最近 5 条有效快照；创建、恢复、删除都会写入审计日志和同步日志。
+
+当前小程序端云端备份默认上传客户端自持密钥的 `aes-256-cbc-hmac-sha256` 密文信封；服务端只校验算法枚举、密文和摘要字段，不保存明文密钥，也不解密快照内容。
 
 ## 9. 隐私安全接口
 

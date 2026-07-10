@@ -1,8 +1,17 @@
 import { z } from "zod";
 
 const privacyStorageModeSchema = z.enum(["plain", "encrypted", "e2ee"]);
-const privacyCipherAlgorithmSchema = z.enum(["none", "aes-256-gcm", "xchacha20-poly1305"]);
-const vaultCipherAlgorithmSchema = z.enum(["aes-256-gcm", "xchacha20-poly1305"]);
+const privacyCipherAlgorithmSchema = z.enum([
+  "none",
+  "aes-256-cbc-hmac-sha256",
+  "aes-256-gcm",
+  "xchacha20-poly1305",
+]);
+const vaultCipherAlgorithmSchema = z.enum([
+  "aes-256-cbc-hmac-sha256",
+  "aes-256-gcm",
+  "xchacha20-poly1305",
+]);
 const syncEntityTypeSchema = z.enum([
   "user_profile",
   "cycle_settings",

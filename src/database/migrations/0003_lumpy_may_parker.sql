@@ -1,0 +1,1 @@
+ALTER TYPE "public"."privacy_cipher_algorithm" ADD VALUE 'aes-256-cbc-hmac-sha256' BEFORE 'aes-256-gcm';

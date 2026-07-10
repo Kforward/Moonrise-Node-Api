@@ -84,7 +84,7 @@ export interface BackupSnapshotRecord {
   userId: string;
   clientBackupId: string;
   encrypted: boolean;
-  algorithm: "none" | "aes-256-gcm" | "xchacha20-poly1305";
+  algorithm: PrivacyCipherAlgorithm;
   keyVersion: number;
   sizeBytes: number;
   snapshotCiphertext: string;
@@ -95,7 +95,11 @@ export interface BackupSnapshotRecord {
 }
 
 export type PrivacyStorageMode = "plain" | "encrypted" | "e2ee";
-export type PrivacyCipherAlgorithm = "none" | "aes-256-gcm" | "xchacha20-poly1305";
+export type PrivacyCipherAlgorithm =
+  | "none"
+  | "aes-256-cbc-hmac-sha256"
+  | "aes-256-gcm"
+  | "xchacha20-poly1305";
 
 export interface PrivacyConfigRecord {
   userId: string;

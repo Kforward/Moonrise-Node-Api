@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-const backupAlgorithmSchema = z.enum(["none", "aes-256-gcm", "xchacha20-poly1305"]);
+const backupAlgorithmSchema = z.enum([
+  "none",
+  "aes-256-cbc-hmac-sha256",
+  "aes-256-gcm",
+  "xchacha20-poly1305",
+]);
 
 export const listBackupSnapshotsQuerySchema = z.object({
   cursor: z.string().optional(),
@@ -22,6 +27,24 @@ export const createBackupSnapshotSchema = z.object({
     snapshotCiphertext: z.string().min(1, "snapshotCiphertext 不能为空"),
     snapshotHash: z.string().min(1, "snapshotHash 不能为空").max(256),
   }),
+}).superRefine((input, context) => {
+  const payload = input.payload;
+
+  if (!payload.encrypted && payload.algorithm !== "none") {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "未加密备份必须使用 none 算法",
+      path: ["payload", "algorithm"],
+    });
+  }
+
+  if (payload.encrypted && payload.algorithm === "none") {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "加密备份必须指定真实加密算法",
+      path: ["payload", "algorithm"],
+    });
+  }
 });
 
 export const restoreBackupSnapshotSchema = z.object({
