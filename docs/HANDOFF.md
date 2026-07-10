@@ -3,7 +3,7 @@
 ## 当前上下文
 - 分支：`main`
 - 本次文档初始化基线提交：`db8d908 feat(docs): 更新生产环境部署说明文档，添加环境变量配置和数据库迁移流程`
-- 当前目标：核心 API 与应用级业务接口已补齐；当前已同步前端小程序端隐私密文信封算法，后续重点转向 PostgreSQL 边界测试、Redis/多实例限流、事务一致性和安全失败路径审计。
+- 当前目标：核心 API 与应用级业务接口已补齐；当前已同步前端小程序端隐私密文信封算法，并补充 key wrap 恢复策略。后续重点转向 PostgreSQL 边界测试、Redis/多实例限流、事务一致性和安全失败路径审计。
 
 ## 恢复工作流程
 ```bash
@@ -36,10 +36,12 @@ npm run test:postgres
 - 若新增功能或改变契约，同步更新 `backend_ai_docs/openapi.json`、相关设计文档、`docs/STATUS.md` 和 `docs/HANDOFF.md`。
 - 如果继续扩展应用级能力，优先沿用 `src/modules/app/` 的 route/service/repository 分层。
 - 若继续前端联调：确认前端上传的 `aes-256-cbc-hmac-sha256` 备份快照可通过 `/api/v1/backups/create` 入库；服务端只校验枚举和元数据，不解密密文正文。
+- 若继续恢复能力：先实现前端 DEK/KEK 和 key wrap，再在后端落地 `privacy_key_wraps` 表、`/privacy/key-wraps/*` 接口和审计日志。
 
 ## 最近验证
 - `npm test`：通过，包含 `tsc --noEmit` 和 13 个默认集成测试。
 - `npm run lint`：通过。
+- `git diff --check`：通过；本轮 key wrap 策略文档改动无空白错误。
 - 未运行 `npm run test:postgres`：需要独立 PostgreSQL 测试库和显式环境变量。
 
 ## 已知问题
@@ -47,3 +49,4 @@ npm run test:postgres
 - 当前限流主要是进程内固定窗口实现，多实例部署需要替换为共享限流存储。
 - 部分 PostgreSQL 列表查询仍存在全量查询后内存切页的生产化优化空间。
 - 新增 PostgreSQL enum 迁移后，部署到已有数据库时需先执行 `npm run db:migrate`。
+- key wrap 当前仅为设计草案，尚未新增 schema、迁移或公开接口。

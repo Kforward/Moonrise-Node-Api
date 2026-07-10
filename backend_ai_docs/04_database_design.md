@@ -154,6 +154,8 @@ erDiagram
 | `e2ee_enabled` | `boolean` | 是否启用端到端加密 |
 | `recovery_enabled` | `boolean` | 是否启用恢复方案 |
 
+后续恢复能力不直接扩展为明文密钥字段；恢复材料应独立托管为 key wrap，`privacy_configs` 只记录当前密钥版本和是否启用恢复能力。
+
 ### 4.9 `encrypted_vault_items`
 
 用于端到端加密模式。服务端只知道条目类型、密钥版本、算法和密文，不理解明文内容。
@@ -244,7 +246,29 @@ erDiagram
 | `content` | `text` | 条目内容 |
 | `sort_order` | `integer` | 展示排序 |
 
-### 4.15 加密算法枚举
+### 4.15 `privacy_key_wraps`（后续恢复能力）
+
+该表用于托管被 KEK 包裹后的 DEK，支持同设备解锁、恢复密钥、密码/PIN 和可信设备换机。服务端不保存明文 DEK、KEK、PIN、密码或恢复短语。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | `uuid` | key wrap ID |
+| `user_id` | `uuid` | 所属用户 |
+| `wrap_type` | `varchar(40)` | `device-local` / `passphrase` / `recovery-key` / `trusted-device` |
+| `device_id` | `uuid` | 关联设备，可为空 |
+| `key_version` | `integer` | 被包裹 DEK 的版本 |
+| `algorithm` | `privacy_cipher_algorithm` | 包裹算法 |
+| `kdf` | `varchar(80)` | 例如 `pbkdf2-sha256`，后续可升级为 `argon2id` |
+| `salt` | `text` | KDF salt 或包裹参数 |
+| `nonce` | `text` | 包裹 nonce/iv |
+| `wrapped_key` | `text` | 被 KEK 加密后的 DEK |
+| `content_hash` | `text` | wrapped key 摘要 |
+| `created_at` | `timestamptz` | 创建时间 |
+| `revoked_at` | `timestamptz` | 撤销时间 |
+
+建议索引：`(user_id, wrap_type, revoked_at)`、`(user_id, device_id)`。创建、撤销、恢复和 reset 都应写入 `audit_logs`。
+
+### 4.16 加密算法枚举
 
 `privacy_cipher_algorithm` 当前允许 `none`、`aes-256-cbc-hmac-sha256`、`aes-256-gcm` 和 `xchacha20-poly1305`。其中 `aes-256-cbc-hmac-sha256` 用于兼容当前小程序端 CryptoJS 能力的客户端密文信封，服务端只存储算法名、密钥版本、密文和摘要，不解密快照或 vault 正文。
 

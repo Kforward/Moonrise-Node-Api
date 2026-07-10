@@ -163,6 +163,17 @@
 | `POST` | `/api/v1/privacy/vault-items/save` | 保存端到端加密条目 |
 | `GET` | `/api/v1/privacy/vault-items` | 拉取端到端加密条目 |
 
+后续进入密码锁、恢复密钥和可信设备阶段时，在隐私模块下新增 key wrap 托管接口：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/privacy/key-wraps` | 获取当前用户可用的 key wrap 元数据，不返回明文密钥 |
+| `POST` | `/api/v1/privacy/key-wraps/save` | 保存或轮换被 KEK 包裹后的 DEK |
+| `POST` | `/api/v1/privacy/key-wraps/revoke` | 撤销某个设备、恢复密钥或密码包裹 |
+| `POST` | `/api/v1/privacy/key-wraps/reset` | 用户确认不可恢复后重置加密数据和 key wrap |
+
+key wrap payload 只允许上传 `wrapType`、`algorithm`、`kdf`、`salt`、`nonce`、`wrappedKey`、`keyVersion`、`deviceId` 等元数据和密文；服务端不接收明文 DEK、PIN、密码或恢复短语。
+
 ## 10. 分页规则
 
 - 列表接口默认 `limit=20`，最大 `limit=100`。
